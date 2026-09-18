@@ -1,0 +1,154 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function usuarioExiste() {
+      return isSignedIn() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+    function usuarioAtual() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+    function isOperador() { return usuarioExiste() && usuarioAtual().bloqueado != true; }
+    function isAdmin() { return isOperador() && usuarioAtual().role == 'admin'; }
+    function filialDo(data) { return ('filialId' in data) ? data.filialId : 'matriz'; }
+    function podeAcessarFilial(filialId) {
+      return isAdmin() || (isOperador() && (
+        (('filiais' in usuarioAtual()) && filialId in usuarioAtual().filiais)
+        || (!('filiais' in usuarioAtual()) && filialId == 'matriz')
+      ));
+    }
+    function podeLerDocumento() { return podeAcessarFilial(filialDo(resource.data)); }
+    function podeCriarDocumento() {
+      return ('filialId' in request.resource.data) && podeAcessarFilial(request.resource.data.filialId);
+    }
+    function podeAtualizarDocumento() {
+      return podeLerDocumento() && filialDo(request.resource.data) == filialDo(resource.data);
+    }
+    function filialAtiva(filialId) {
+      return exists(/databases/$(database)/documents/filiais/$(filialId))
+        && get(/databases/$(database)/documents/filiais/$(filialId)).data.ativa == true;
+    }
+    function idClienteValido(clienteId, filialId) {
+      return (filialId == 'matriz' && clienteId == request.auth.uid)
+        || clienteId == filialId + '__' + request.auth.uid;
+    }
+    function configPublica(configId) {
+      return configId.matches('^(.*__)?(loja|banner|pagamentos|personalizacao)$');
+    }
+    function contadorPedido(configId) {
+      return configId.matches('^(.*__)?contador$');
+    }
+    function idContadorValido(configId, filialId) {
+      return (filialId == 'matriz' && configId == 'contador')
+        || configId == filialId + '__contador';
+    }
+
+    match /filiais/{filialId} {
+      allow read: if isOperador();
+      allow create, update, delete: if isAdmin();
+    }
+    match /usuarios/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'email', 'photoURL']));
+    }
+    match /estoque/{produtoId} {
+      allow read: if filialAtiva(filialDo(resource.data));
+      allow create: if isOperador() && podeCriarDocumento();
+      allow delete: if isOperador() && podeLerDocumento();
+      allow update: if isOperador() && podeAtualizarDocumento();
+    }
+    match /clientes/{clienteId} {
+      allow read: if (isOperador() && podeLerDocumento()) || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if podeCriarDocumento() || (isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && idClienteValido(clienteId, request.resource.data.filialId)
+        && filialAtiva(request.resource.data.filialId)
+        && request.resource.data.keys().hasOnly(['nome', 'tel', 'endereco', 'numero', 'cep', 'pagamentoPreferido', 'email', 'uid', 'dataCadastro', 'filialId']));
+      allow update: if (isOperador() && podeAtualizarDocumento()) || (isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && idClienteValido(clienteId, request.resource.data.filialId)
+        && filialDo(request.resource.data) == filialDo(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'tel', 'endereco', 'numero', 'cep', 'pagamentoPreferido', 'email', 'dataCadastro']));
+      allow delete: if isOperador() && podeLerDocumento();
+    }
+    match /vendas/{vendaId} {
+      allow read: if (isOperador() && podeLerDocumento()) || (isSignedIn() && resource.data.clienteUid == request.auth.uid);
+      allow create: if podeCriarDocumento() || (isSignedIn()
+        && request.resource.data.clienteUid == request.auth.uid
+        && request.resource.data.filialId is string
+        && filialAtiva(request.resource.data.filialId)
+        && request.resource.data.total is number && request.resource.data.total > 0
+        && request.resource.data.itens is list
+        && request.resource.data.itens.size() > 0
+        && request.resource.data.itens.size() <= 100
+        && request.resource.data.status == 'Pendente'
+        && request.resource.data.estoqueBaixado == false
+        && request.resource.data.origem == 'cliente'
+        && request.resource.data.keys().hasOnly(['filialId', 'clienteUid', 'clienteNome', 'clienteTel', 'clienteEndereco', 'total', 'itens', 'numeroPedido', 'formaPagamento', 'data', 'dataIso', 'status', 'estoqueBaixado', 'origem']));
+      allow update: if isOperador() && podeAtualizarDocumento();
+      allow delete: if false;
+    }
+    match /config/{configId} {
+      allow read: if configPublica(configId) || (contadorPedido(configId) && isSignedIn())
+        || (isOperador() && podeLerDocumento());
+      allow create: if (isOperador() && podeCriarDocumento()) || (isSignedIn()
+        && contadorPedido(configId)
+        && idContadorValido(configId, request.resource.data.filialId)
+        && request.resource.data.numero == 1
+        && filialAtiva(request.resource.data.filialId)
+        && request.resource.data.keys().hasOnly(['numero', 'filialId']));
+      allow update: if (isOperador() && podeAtualizarDocumento()) || (isSignedIn()
+        && contadorPedido(configId)
+        && idContadorValido(configId, request.resource.data.filialId)
+        && filialDo(request.resource.data) == filialDo(resource.data)
+        && filialAtiva(request.resource.data.filialId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['numero'])
+        && request.resource.data.numero == resource.data.numero + 1);
+      allow delete: if isOperador() && podeAtualizarDocumento();
+    }
+    match /caixas/{id} {
+      allow read: if isOperador() && podeLerDocumento();
+      allow create: if isOperador() && podeCriarDocumento();
+      allow update, delete: if isOperador() && podeAtualizarDocumento();
+    }
+    match /movimentacoes_caixa/{id} {
+      allow read: if isOperador() && podeLerDocumento();
+      allow create: if isOperador() && podeCriarDocumento();
+      allow update, delete: if isOperador() && podeAtualizarDocumento();
+    }
+    match /logs/{id} {
+      allow read: if isOperador() && podeLerDocumento();
+      allow create: if isOperador() && podeCriarDocumento();
+      allow update, delete: if false;
+    }
+    match /fornecedores/{id} {
+      allow read: if isOperador() && podeLerDocumento();
+      allow create: if isOperador() && podeCriarDocumento();
+      allow update, delete: if isOperador() && podeAtualizarDocumento();
+    }
+    match /entradas/{id} {
+      allow read: if isOperador() && podeLerDocumento();
+      allow create: if isOperador() && podeCriarDocumento();
+      allow update, delete: if isOperador() && podeAtualizarDocumento();
+    }
+    match /mesas/{id} {
+      allow read: if isOperador() && podeLerDocumento();
+      allow create: if isOperador() && podeCriarDocumento();
+      allow update, delete: if isOperador() && podeAtualizarDocumento();
+    }
+    match /movimentacoes_estoque/{id} {
+      allow read: if isOperador() && podeLerDocumento();
+      allow create: if isOperador() && podeCriarDocumento();
+      allow update, delete: if false;
+    }
+    match /contas_pagar/{id} {
+      allow read: if isOperador() && podeLerDocumento();
+      allow create: if isOperador() && podeCriarDocumento();
+      allow update, delete: if isOperador() && podeAtualizarDocumento();
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

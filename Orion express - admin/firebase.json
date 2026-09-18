@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs18"
+  },
+  "firestore": {
+    "rules": "firestore.multifilial.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

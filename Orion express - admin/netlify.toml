@@ -1,0 +1,8 @@
+# Orion Express — Admin (deploy estático)
+# Este é um site 100% estático (index.html + script.js + style.css + CDNs).
+# NÃO use vite build: o Vite não copia script.js/style.css para o dist/
+# (tags sem type="module"), causando 404 → "ReferenceError: X is not defined".
+# Publica a raiz do repositório sem etapa de build.
+[build]
+  command = "true"
+  publish = "."
