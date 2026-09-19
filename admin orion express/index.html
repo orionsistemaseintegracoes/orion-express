@@ -1,0 +1,3011 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orion Express - PDV</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Supabase e Compatibilidade Firebase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase-compat.js?v=9"></script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="icon" type="image/png" href="./orion-logo.png">
+
+</head>
+
+<body class="bg-neutral-900 text-gray-100 font-sans antialiased overflow-hidden h-screen">
+  <div id="toast-container"></div>
+
+  <section id="login-page" class="absolute inset-0 z-50 flex items-center justify-center bg-neutral-900">
+    <div class="bg-neutral-800 p-8 rounded-xl border border-amber-500/30 shadow-2xl w-full max-w-md text-center">
+      <!-- Logo -->
+      <div class="mb-6">
+        <img id="login-logo" src="orion-logo.png" alt="Orion Express" class="w-32 h-32 mx-auto mb-4 drop-shadow-2xl"
+          onerror="this.style.display='none'; document.getElementById('pdv-logo-fallback').style.display='block'">
+        <div id="pdv-logo-fallback" style="display:none;">
+          <h1 class="text-4xl font-bold text-amber-500 neon-text">🚀 Orion Express</h1>
+        </div>
+        <h2 class="text-2xl font-bold text-white mt-2">Portal de Vendas</h2>
+      </div>
+      <p class="text-gray-400 mb-6">Aqui você pode gerenciar suas vendas e muito mais.</p>
+
+      <div class="space-y-4 mb-6 text-left">
+        <input id="login-email" type="email" placeholder="E-mail do Funcionário"
+          class="input-field py-3 text-white placeholder-gray-500">
+        <input id="login-senha" type="password" placeholder="Senha"
+          class="input-field py-3 text-white placeholder-gray-500">
+      </div>
+
+      <p id="login-aviso" class="hidden text-red-400 text-sm font-semibold mb-4"></p>
+
+      <button onclick="login()"
+        class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-3 rounded-lg transition-colors shadow-lg shadow-amber-500/20 mb-4">
+        ENTRAR
+      </button>
+
+      <p class="text-xs text-gray-500 mt-4">
+        Acesso restrito aos operadores do sistema. Novos funcionários são cadastrados pelo administrador nas
+        <strong>Configurações</strong>.
+      </p>
+    </div>
+  </section>
+  <div id="cadastroModal" class="fixed inset-0 bg-black/70 z-[100] hidden items-center justify-center fade-in">
+    <div class="bg-neutral-800 p-8 rounded-xl border border-amber-500/30 shadow-2xl w-full max-w-md">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-amber-500">Novo Funcionário</h2>
+        <button onclick="fecharModalCadastro()" class="text-gray-400 hover:text-white">
+          <i class="fa fa-times text-xl"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <input id="cadastro-email" type="email" placeholder="E-mail (acesso)"
+          class="input-field py-3 text-white placeholder-gray-500">
+        <input id="cadastro-senha" type="password" placeholder="Senha (mínimo 6 caracteres)"
+          class="input-field py-3 text-white placeholder-gray-500">
+        <input id="cadastro-nome" type="text" placeholder="Nome Completo"
+          class="input-field py-3 text-white placeholder-gray-500">
+        <p class="text-xs text-gray-400 leading-relaxed">
+        </p>
+      </div>
+
+      <button onclick="cadastrarNovoFuncionario()"
+        class="w-full mt-6 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg shadow-green-600/20">
+        CADASTRAR FUNCIONÁRIO
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmação Genérico -->
+  <div id="modalConfirmacao" class="fixed inset-0 bg-black/70 z-[120] hidden items-center justify-center fade-in p-4"
+    onclick="if(event.target===this) fecharModalConfirmacao()">
+    <div class="bg-neutral-800 rounded-xl border border-amber-500/20 w-full max-w-md shadow-2xl">
+      <div class="p-6 text-center">
+        <div id="confirmacao-icone" class="mx-auto mb-4 w-14 h-14 rounded-full flex items-center justify-center">
+          <i class="fa fa-question text-2xl"></i>
+        </div>
+        <h3 id="confirmacao-titulo" class="text-xl font-bold text-white mb-2"></h3>
+        <p id="confirmacao-mensagem" class="text-sm text-gray-400 mb-1"></p>
+        <p id="confirmacao-detalhe" class="text-sm text-gray-300 font-medium"></p>
+      </div>
+      <div class="p-5 border-t border-gray-700 flex gap-3 justify-center">
+        <button onclick="fecharModalConfirmacao()"
+          class="px-6 py-2.5 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-gray-300 font-medium transition-colors">
+          Cancelar
+        </button>
+        <button id="confirmacao-btn-acao" class="px-6 py-2.5 rounded-lg font-bold transition-colors shadow-lg">
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="main-app" class="hidden flex h-full">
+
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <aside class="admin-sidebar flex-shrink-0 flex-col">
+      <div class="sidebar-brand">
+        <img id="sidebar-logo-img" src="orion-logo.png" alt="Orion Express" class="sidebar-logo"
+          onerror="this.style.display='none'; document.getElementById('pdv-sidebar-fallback').style.display='block'">
+        <div id="pdv-sidebar-fallback" style="display:none;">
+          <h2 class="text-2xl font-bold text-blue-500">Orion Express</h2>
+        </div>
+      </div>
+      <nav class="sidebar-nav flex-grow">
+        <button onclick="mostrarPagina('dashboard')" id="btn-dashboard" class="nav-btn active"><i
+            class="fa fa-home w-6"></i> Dashboard</button>
+        <button onclick="mostrarPagina('venda')" id="btn-venda" class="nav-btn"><i class="fa fa-cash-register w-6"></i>
+          Venda Rápida</button>
+        <button onclick="mostrarPagina('mesas')" id="btn-mesas" class="nav-btn"><i class="fa fa-utensils w-6"></i>
+          Comanda por Mesa</button>
+        <button onclick="mostrarPagina('vendas')" id="btn-vendas" class="nav-btn"><i class="fa fa-list-alt w-6"></i>
+          Pedidos</button>
+        <button onclick="mostrarPagina('cadastros')" id="btn-cadastros" class="nav-btn"><i
+            class="fa fa-address-card w-6"></i>
+          Cadastros</button>
+        <button onclick="mostrarPagina('entradas')" id="btn-entradas" class="nav-btn"><i
+            class="fa fa-truck-ramp-box w-6"></i>
+          Entradas</button>
+        <button onclick="mostrarPagina('contas')" id="btn-contas" class="nav-btn"><i
+            class="fa fa-money-bill-wave w-6"></i> Contas a Pagar</button>
+        <button onclick="mostrarPagina('caixa')" id="btn-caixa" class="nav-btn"><i class="fa fa-wallet w-6"></i>
+          Caixa</button>
+        <button onclick="mostrarPagina('relatorios')" id="btn-relatorios" class="nav-btn"><i
+            class="fa fa-chart-bar w-6"></i> Relatórios</button>
+        <button onclick="mostrarPagina('config')" id="btn-config" class="nav-btn"><i class="fa fa-cog w-6"></i>
+          Configurações</button>
+      </nav>
+      <div class="store-switcher" onclick="logout()" title="Clique para sair">
+        <div class="store-icon"><i class="fa fa-store"></i></div>
+        <div class="min-w-0 flex-1">
+          <p id="sidebar-loja-nome" class="store-name">Orion Burger</p>
+          <p id="sidebar-loja-unidade" class="store-unit">Loja Matriz</p>
+        </div>
+        <i class="fa fa-chevron-down store-chevron"></i>
+      </div>
+    </aside>
+
+    <main class="admin-main flex-grow overflow-auto h-screen">
+
+      <div class="flex items-center gap-3 px-4 pt-3 md:hidden">
+        <button onclick="toggleSidebar()" class="header-icon" title="Mostrar/ocultar menu">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <div id="dashboard" class="page-content hidden fade-in">
+
+        <div class="dashboard-header">
+          <h1>Pedidos</h1>
+          <div class="header-actions">
+            <div class="notif-wrap">
+              <button class="header-icon" onclick="toggleNotificacoes(event)" aria-label="Notificações">
+                <i class="far fa-bell"></i><span id="notif-badge" class="hidden">0</span>
+              </button>
+              <div id="notif-panel" class="notif-panel hidden">
+                <div class="notif-header"><i class="fa fa-bell"></i> Pedidos novos</div>
+                <div id="notif-list" class="notif-list"></div>
+              </div>
+            </div>
+            <div class="flex flex-col items-center">
+              <div id="admin-avatar" class="admin-avatar"><i class="fas fa-user"></i></div>
+              <span id="admin-avatar-nome"
+                class="text-xs text-gray-300 font-semibold max-w-[140px] truncate hidden"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+
+          <!-- Board de Pedidos -->
+          <section class="orders-column">
+            <div class="search-box">
+              <i class="fa fa-search"></i>
+              <input id="busca-pedido" oninput="filtrarPedidosBoard()" type="text" placeholder="Buscar pedido...">
+            </div>
+            <!-- Abas de status -->
+            <div id="board-tabs" class="board-tabs">
+              <button onclick="filtrarPedidosBoard('todos')" data-filtro="todos" class="board-tab active">Todos
+              </button>
+              <button onclick="filtrarPedidosBoard('novos')" data-filtro="novos" class="board-tab">Novos <span
+                  id="count-novos">0</span>
+              </button>
+              <button onclick="filtrarPedidosBoard('preparo')" data-filtro="preparo" class="board-tab">Em preparo <span
+                  id="count-preparo">0</span>
+              </button>
+              <button onclick="filtrarPedidosBoard('saiu')" data-filtro="saiu" class="board-tab">Saiu para Entrega <span
+                  id="count-saiu">0</span>
+              </button>
+              <button onclick="filtrarPedidosBoard('entregues')" data-filtro="entregues" class="board-tab">Entregues
+              </button>
+            </div>
+
+            <!-- Cards de Pedidos -->
+            <div id="board-list" class="board-list">
+              <div class="text-gray-500 italic py-10 text-center">Carregando pedidos...</div>
+            </div>
+
+            <!-- Paginação -->
+            <div id="board-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPagina(-1)" id="pagina-anterior" class="board-page-btn" disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="board-page-info" class="board-page-info"></span>
+              <button onclick="mudarPagina(1)" id="pagina-proxima" class="board-page-btn" disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </section>
+
+          <!-- Painel Lateral: Resumo -->
+          <aside class="summary-column">
+
+            <!-- Resumo do dia -->
+            <div class="summary-panel day-summary">
+              <h2>Resumo do dia</h2>
+              <div class="summary-stats">
+                <div class="summary-stat">
+                  <p>Pedidos</p>
+                  <strong id="sum-pedidos">0</strong>
+                </div>
+                <div class="summary-stat">
+                  <p>Faturamento</p>
+                  <strong id="sum-faturamento">R$ 0,00</strong>
+                </div>
+                <div class="summary-stat">
+                  <p>Ticket médio</p>
+                  <strong id="sum-ticket">R$ 0,00</strong>
+                </div>
+                <div class="summary-stat">
+                  <p>Novos clientes</p>
+                  <strong id="sum-clientes">0</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Gráfico de vendas (hoje) -->
+            <div class="summary-panel sales-panel">
+              <div class="panel-title-row">
+                <h2>Gráfico de vendas do dia</h2>
+              </div>
+              <div class="sales-chart-wrap">
+                <canvas id="graficoVendasHoje"></canvas>
+              </div>
+            </div>
+
+            <!-- Formas de pagamento -->
+            <div class="summary-panel payments-panel">
+              <h2>Formas de pagamento do dia</h2>
+              <div id="lista-pagamento" class="payment-list"></div>
+            </div>
+          </aside>
+        </div>
+        <footer class="dashboard-footer">Orion Express — Pedidos online</footer>
+      </div>
+
+      <div id="venda" class="page-content space-y-6 hidden fade-in">
+        <h1 class="text-3xl font-bold text-white">Pdv Express — Nova Venda</h1>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[80vh]">
+          <div class="lg:col-span-2 bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg flex flex-col">
+            <h3 class="text-xl font-bold mb-4 text-white">Produtos Disponíveis</h3>
+            <div class="mb-4 space-y-3">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300">Filtros</h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label for="venda-busca-produto-nome" class="text-sm text-gray-400 block mb-1">Buscar por nome</label>
+                  <input id="venda-busca-produto-nome" type="text" placeholder="Digite o nome do produto..."
+                    class="input-field" oninput="filtrarProdutosVenda()">
+                </div>
+                <div>
+                  <label for="venda-busca-produto-codigo" class="text-sm text-gray-400 block mb-1">Buscar por ID</label>
+                  <input id="venda-busca-produto-codigo" type="number" min="1" placeholder="Ex.: 001"
+                    class="input-field" oninput="filtrarProdutosVenda()">
+                </div>
+              </div>
+            </div>
+            <div id="listaProdutosVenda" class="grid grid-cols-1 md:grid-cols-3 gap-4 overflow-y-auto flex-grow">
+              <p class="text-gray-500 italic">Carregando produtos disponiveis...</p>
+            </div>
+            <div id="venda-produtos-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaProdutosVenda(-1)" id="venda-produtos-pagina-anterior" class="board-page-btn"
+                disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="venda-produtos-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaProdutosVenda(1)" id="venda-produtos-pagina-proxima" class="board-page-btn"
+                disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+          <div class="lg:col-span-1 bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg flex flex-col">
+            <h3 class="text-xl font-bold mb-4 text-white">Carrinho de Vendas</h3>
+            <div id="listaCarrinho" class="flex-grow overflow-y-auto space-y-3 border-b border-gray-700 pb-4 mb-4">
+              <p class="text-center text-gray-500 italic py-10">Adicione um produto para iniciar a venda.</p>
+            </div>
+            <div class="mb-4 space-y-3">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300">Filtros de Cliente</h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label for="venda-busca-cliente-nome" class="text-sm text-gray-400 block mb-1">Buscar por nome</label>
+                  <input id="venda-busca-cliente-nome" type="text" placeholder="Digite o nome do cliente..."
+                    class="input-field" oninput="filtrarSelectClientes()">
+                </div>
+                <div>
+                  <label for="venda-busca-cliente-codigo" class="text-sm text-gray-400 block mb-1">Buscar por ID</label>
+                  <input id="venda-busca-cliente-codigo" type="number" min="1" placeholder="Ex.: 001"
+                    class="input-field" oninput="filtrarSelectClientes()">
+                </div>
+              </div>
+            </div>
+            <div class="mb-4">
+              <label for="selectClienteBtn" class="text-sm text-gray-400 block mb-1">Cliente <span
+                  class="text-red-400">*</span>:</label>
+              <div class="relative">
+                <input type="hidden" id="selectCliente">
+                <button type="button" id="selectClienteBtn" onclick="toggleSelectClientes(event)"
+                  class="input-field appearance-none w-full text-left flex items-center justify-between gap-2">
+                  <span id="selectClienteLabel" class="truncate">-- Selecione o Cliente --</span>
+                  <i class="fa fa-chevron-down text-gray-500"></i>
+                </button>
+                <div id="selectClienteDropdown"
+                  class="status-dropdown absolute right-0 mt-2 w-full bg-neutral-800 rounded-xl shadow-2xl z-20 hidden border border-gray-600 overflow-hidden">
+                  <div id="listaSelectClientes" class="max-h-64 overflow-y-auto"></div>
+                  <div id="select-cliente-pagination" class="board-pagination px-3 py-2" style="display:none">
+                    <button onclick="mudarPaginaSelectClientes(-1)" id="select-cliente-pagina-anterior"
+                      class="board-page-btn" disabled>
+                      <i class="fa fa-chevron-left"></i> Anterior
+                    </button>
+                    <span id="select-cliente-page-info" class="board-page-info"></span>
+                    <button onclick="mudarPaginaSelectClientes(1)" id="select-cliente-pagina-proxima"
+                      class="board-page-btn" disabled>
+                      Próxima <i class="fa fa-chevron-right"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="mb-4">
+              <label for="selectFormaPagamento" class="text-sm text-gray-400 block mb-1">Forma de Pagamento <span
+                  class="text-red-400">*</span>:</label>
+              <select id="selectFormaPagamento"
+                class="input-field appearance-none bg-neutral-900 border border-neutral-600 focus:border-amber-500"
+                required>
+                <option value="">-- Selecione a forma de pagamento --</option>
+              </select>
+            </div>
+            <div class="flex justify-between items-center mb-6 pt-4 border-t border-gray-700">
+              <span class="text-xl text-gray-300">Total:</span>
+              <span id="carrinhoTotal" class="text-3xl font-bold text-amber-500">R$ 0.00</span>
+            </div>
+            <button onclick="finalizarVenda()" id="btnFinalizarVenda" disabled
+              class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg shadow-green-600/20 disabled:opacity-50">
+              FINALIZAR VENDA
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= COMANDA POR MESA ================= -->
+      <div id="mesas" class="page-content space-y-6 hidden fade-in">
+        <div class="flex items-center justify-between">
+          <h1 class="text-3xl font-bold text-white">Comanda por Mesa</h1>
+        </div>
+
+        <!-- Grid de Mesas -->
+        <div id="mesas-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <p class="text-gray-500 italic col-span-full">Carregando mesas...</p>
+        </div>
+
+
+
+        <!-- Modal Abrir Mesa com Nome do Cliente -->
+        <div id="modal-abrir-mesa-cliente"
+          class="fixed inset-0 bg-black/75 z-[95] hidden items-center justify-center fade-in p-4"
+          onclick="if(event.target===this) fecharModalAbrirMesaCliente()">
+          <div class="bg-neutral-800 rounded-xl border border-amber-500/30 w-full max-w-md shadow-2xl overflow-hidden">
+            <div class="p-6">
+              <div
+                class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <i class="fa fa-utensils text-2xl"></i>
+              </div>
+              <h3 id="modal-abrir-mesa-titulo" class="text-xl font-bold text-white text-center mb-2">Abrir Mesa</h3>
+              <p class="text-sm text-gray-400 text-center mb-5">
+                Para iniciar o atendimento desta mesa, é obrigatório informar o nome do cliente.
+              </p>
+
+              <form id="form-abrir-mesa-cliente" onsubmit="event.preventDefault(); confirmarAberturaMesaComCliente();">
+                <div class="space-y-2 mb-6">
+                  <label for="input-abrir-mesa-cliente" class="block text-sm font-medium text-gray-300">
+                    Nome do Cliente <span class="text-red-400">*</span>
+                  </label>
+                  <div class="relative flex items-center">
+                    <span class="absolute left-3.5 z-10 flex items-center text-gray-400 pointer-events-none">
+                      <i class="fa fa-user"></i>
+                    </span>
+                    <input id="input-abrir-mesa-cliente" type="text" required placeholder="Ex.: João Silva"
+                      style="padding-left: 2.75rem !important;"
+                      class="input-field w-full bg-neutral-900 border border-neutral-600 focus:border-amber-500 text-white placeholder-gray-500" />
+                  </div>
+                  <span id="erro-abrir-mesa-cliente" class="text-xs text-red-400 hidden">Informe o nome do
+                    cliente.</span>
+                </div>
+                <div class="border-t border-gray-700 pt-4 flex gap-3 justify-end">
+                  <button type="button" onclick="fecharModalAbrirMesaCliente()"
+                    class="px-5 py-2.5 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-gray-300 font-medium transition-colors">
+                    Cancelar
+                  </button>
+                  <button type="submit" id="btn-confirmar-abertura-mesa"
+                    class="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors shadow-lg shadow-emerald-600/20 flex items-center gap-2">
+                    <i class="fa fa-check"></i> Abrir Mesa
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Fechar Mesa com Forma de Pagamento Obrigatória -->
+        <div id="modal-fechar-mesa-pagamento"
+          class="fixed inset-0 bg-black/75 z-[97] hidden items-center justify-center fade-in p-4"
+          onclick="if(event.target===this) fecharModalFecharMesaPagamento()">
+          <div class="bg-neutral-800 rounded-xl border border-amber-500/30 w-full max-w-md shadow-2xl overflow-hidden">
+            <div class="p-6">
+              <div
+                class="mx-auto mb-4 w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                <i class="fa fa-cash-register text-2xl"></i>
+              </div>
+              <h3 id="modal-fechar-mesa-titulo" class="text-xl font-bold text-white text-center mb-1">Fechar Mesa</h3>
+              <p id="modal-fechar-mesa-cliente" class="text-sm text-gray-400 text-center mb-2">Cliente: ---</p>
+              <div class="bg-neutral-900/60 rounded-lg p-3 text-center border border-neutral-700 mb-5">
+                <span class="text-xs text-gray-400 block uppercase tracking-wider mb-1">Valor Total da Comanda</span>
+                <span id="modal-fechar-mesa-total" class="text-2xl font-bold text-amber-400">R$ 0,00</span>
+              </div>
+
+              <form id="form-fechar-mesa-pagamento" onsubmit="event.preventDefault(); confirmarFechamentoMesa();">
+                <div class="space-y-2 mb-6">
+                  <label for="select-fechar-mesa-pagamento" class="block text-sm font-medium text-gray-300">
+                    Forma de Pagamento <span class="text-red-400">*</span>
+                  </label>
+                  <div class="relative">
+                    <select id="select-fechar-mesa-pagamento" required
+                      class="input-field appearance-none bg-neutral-900 border border-neutral-600 focus:border-amber-500 text-white w-full pr-10 py-2.5">
+                      <option value="">-- Selecione a forma de pagamento --</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                      <i class="fa fa-chevron-down text-sm"></i>
+                    </div>
+                  </div>
+                  <span id="erro-fechar-mesa-pagamento" class="text-xs text-red-400 hidden">Por favor, selecione uma
+                    forma de pagamento.</span>
+                </div>
+
+                <div class="border-t border-gray-700 pt-4 flex gap-3 justify-end">
+                  <button type="button" onclick="fecharModalFecharMesaPagamento()"
+                    class="px-5 py-2.5 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-gray-300 font-medium transition-colors">
+                    Cancelar
+                  </button>
+                  <button type="submit" id="btn-confirmar-fechar-mesa"
+                    class="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold transition-colors shadow-lg shadow-red-600/20 flex items-center gap-2">
+                    <i class="fa fa-check"></i> Fechar e Finalizar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Remover Quantidade do Item da Mesa -->
+        <div id="modal-remover-qtd-comanda"
+          class="fixed inset-0 bg-black/75 z-[96] hidden items-center justify-center fade-in p-4"
+          onclick="if(event.target===this) fecharModalRemoverQtdComanda()">
+          <div class="bg-neutral-800 rounded-xl border border-red-500/30 w-full max-w-md shadow-2xl overflow-hidden">
+            <div class="p-6">
+              <div
+                class="mx-auto mb-4 w-14 h-14 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center">
+                <i class="fa fa-trash text-2xl"></i>
+              </div>
+              <h3 class="text-xl font-bold text-white text-center mb-1">Remover do Pedido</h3>
+              <p id="modal-remover-qtd-nome-produto"
+                class="text-sm font-semibold text-amber-400 text-center mb-2 truncate">Produto</p>
+              <p id="modal-remover-qtd-info" class="text-xs text-gray-400 text-center mb-5">
+                Quantidade atual no pedido: <span id="modal-remover-qtd-atual" class="font-bold text-white">1</span>
+              </p>
+
+              <form id="form-remover-qtd-comanda" onsubmit="event.preventDefault(); confirmarRemocaoQtdComanda();">
+                <div class="space-y-2 mb-6">
+                  <label for="input-remover-qtd-comanda" class="block text-sm font-medium text-gray-300">
+                    Quantidade a remover <span class="text-red-400">*</span>
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="alterarInputRemoverQtd(-1)"
+                      class="w-11 h-11 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-white font-bold text-lg flex items-center justify-center transition-colors">
+                      -
+                    </button>
+                    <input id="input-remover-qtd-comanda" type="number" min="1" step="1" required
+                      class="input-field text-center font-bold text-lg bg-neutral-900 border border-neutral-600 focus:border-red-500 text-white" />
+                    <button type="button" onclick="alterarInputRemoverQtd(1)"
+                      class="w-11 h-11 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-white font-bold text-lg flex items-center justify-center transition-colors">
+                      +
+                    </button>
+                    <button type="button" onclick="definirRemoverTodasQtd()"
+                      class="px-3 py-2.5 rounded-lg bg-red-950/60 border border-red-500/40 hover:bg-red-900/60 text-red-300 text-xs font-semibold whitespace-nowrap transition-colors"
+                      title="Remover todas as unidades">
+                      Todas
+                    </button>
+                  </div>
+                  <span id="erro-remover-qtd-comanda" class="text-xs text-red-400 hidden">Informe uma quantidade
+                    válida.</span>
+                </div>
+
+                <div class="border-t border-gray-700 pt-4 flex gap-3 justify-end">
+                  <button type="button" onclick="fecharModalRemoverQtdComanda()"
+                    class="px-5 py-2.5 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-gray-300 font-medium transition-colors">
+                    Cancelar
+                  </button>
+                  <button type="submit" id="btn-confirmar-remocao-qtd"
+                    class="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold transition-colors shadow-lg shadow-red-600/20 flex items-center gap-2">
+                    <i class="fa fa-trash"></i> Confirmar Remoção
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Painel lateral da Comanda (oculto por padrão) -->
+        <div id="comanda-panel" class="hidden fixed inset-0 z-50 flex">
+          <div class="absolute inset-0 bg-black/60" onclick="fecharComandaPanel()"></div>
+          <div
+            class="relative ml-auto w-full max-w-lg bg-neutral-800 border-l border-amber-500/20 shadow-2xl flex flex-col fade-in">
+            <!-- Header da Comanda -->
+            <div class="p-5 border-b border-gray-700 flex items-center justify-between">
+              <div>
+                <h2 id="comanda-titulo" class="text-xl font-bold text-white">Mesa 01</h2>
+                <p id="comanda-subtitulo" class="text-sm text-gray-400">Comanda #001 — Em andamento</p>
+              </div>
+              <button onclick="fecharComandaPanel()" class="text-gray-400 hover:text-white text-2xl"><i
+                  class="fa fa-times"></i></button>
+            </div>
+
+            <!-- Lista de produtos disponíveis -->
+            <div class="p-4 border-b border-gray-700">
+              <input id="comanda-busca" type="text" placeholder="Buscar produto..." class="input-field w-full mb-3"
+                oninput="renderizarProdutosComanda()">
+              <div id="comanda-lista-produtos" class="max-h-48 overflow-y-auto space-y-1"></div>
+            </div>
+
+            <!-- Itens da comanda -->
+            <div class="flex-grow overflow-y-auto p-4 space-y-2">
+              <div id="comanda-itens" class="space-y-2">
+                <p class="text-gray-500 italic text-center py-6">Nenhum item adicionado.</p>
+              </div>
+            </div>
+
+            <!-- Total + Ações -->
+            <div class="p-5 border-t border-gray-700 space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-lg text-gray-300">Total:</span>
+                <span id="comanda-total" class="text-2xl font-bold text-amber-500">R$ 0,00</span>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <button onclick="fecharMesaAtual()"
+                  class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg">
+                  <i class="fa fa-lock mr-2"></i>FECHAR MESA
+                </button>
+                <button id="btn-adicionar-ao-pedido" onclick="adicionarAoPedidoMesa()"
+                  class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-2 rounded-lg transition-colors shadow-lg text-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  disabled>
+                  <i class="fa fa-plus-circle"></i> ADICIONAR AO PEDIDO
+                </button>
+              </div>
+              <button onclick="imprimirComandaMesaAtual()"
+                class="w-full bg-neutral-700 hover:bg-neutral-600 text-white font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm border border-neutral-600">
+                <i class="fa fa-print"></i> Imprimir Parcial da Mesa
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="caixa" class="page-content space-y-6 hidden fade-in">
+        <h1 class="text-3xl font-bold text-white">Gerenciamento de Caixa</h1>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 space-y-6">
+            <div class="bg-neutral-800 rounded-xl border border-amber-500/20 shadow-lg p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-white">Caixa Atual</h3>
+                <span id="caixa-status-badge"
+                  class="px-3 py-1 rounded-full text-sm font-semibold bg-neutral-700 text-gray-300">Carregando...</span>
+              </div>
+              <div id="caixa-aberto-info">
+                <p class="text-gray-500 italic">Verificando caixa aberto...</p>
+              </div>
+            </div>
+
+            <div class="bg-neutral-800 rounded-xl border border-amber-500/20 shadow-lg p-6" id="caixa-lancamentos-card">
+              <h3 class="text-xl font-bold mb-4 text-white">Lançamentos do Caixa</h3>
+              <div id="caixa-movimentacoes-container">
+                <p class="text-gray-500 italic">Abra o caixa para registrar lançamentos.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-6">
+            <div class="bg-neutral-800 rounded-xl border border-amber-500/20 shadow-lg p-6" id="caixa-abertura-card">
+              <h3 class="text-xl font-bold mb-4 text-white">Abrir Caixa</h3>
+              <form onsubmit="abrirCaixa(event)">
+                <label class="text-sm text-gray-400 block mb-1">Valor de Abertura (R$):</label>
+                <input type="number" id="caixa-valor-abertura" step="0.01" min="0" placeholder="0,00"
+                  class="input-field bg-neutral-900 border border-neutral-600 focus:border-amber-500 mb-4">
+                <button type="submit"
+                  class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">ABRIR
+                  CAIXA</button>
+              </form>
+            </div>
+
+            <div class="bg-neutral-800 rounded-xl border border-amber-500/20 shadow-lg p-6" id="caixa-fechamento-card">
+              <h3 class="text-xl font-bold mb-4 text-white">Fechar Caixa</h3>
+              <div id="caixa-fechamento-container">
+                <p class="text-gray-500 italic">Abra o caixa para fechá-lo.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-neutral-800 rounded-xl border border-amber-500/20 shadow-lg overflow-hidden">
+          <div class="p-4 bg-neutral-900/50 border-b border-gray-700">
+            <h3 class="text-xl font-bold text-white">Histórico de Caixas</h3>
+          </div>
+          <div class="overflow-x-auto p-4">
+            <table class="w-full text-sm text-left text-gray-300">
+              <thead class="text-xs uppercase text-gray-400">
+                <tr>
+                  <th class="px-4 py-2">Seq</th>
+                  <th class="px-4 py-2">Data</th>
+                  <th class="px-4 py-2">Status</th>
+                  <th class="px-4 py-2">Abertura</th>
+                  <th class="px-4 py-2">Esperado</th>
+                  <th class="px-4 py-2">Contado</th>
+                  <th class="px-4 py-2">Diferença</th>
+                </tr>
+              </thead>
+              <tbody id="caixa-historico-tbody"></tbody>
+            </table>
+          </div>
+          <div id="caixa-historico-pagination" class="board-pagination" style="display:none">
+            <button onclick="mudarPaginaHistoricoCaixas(-1)" id="caixa-historico-pagina-anterior" class="board-page-btn"
+              disabled>
+              <i class="fa fa-chevron-left"></i> Anterior
+            </button>
+            <span id="caixa-historico-page-info" class="board-page-info"></span>
+            <button onclick="mudarPaginaHistoricoCaixas(1)" id="caixa-historico-pagina-proxima" class="board-page-btn"
+              disabled>
+              Próxima <i class="fa fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="vendas" class="page-content space-y-6 hidden fade-in">
+        <h1 class="text-3xl font-bold text-white">Histórico de Pedidos/Vendas</h1>
+        <div class="bg-neutral-800 rounded-xl border border-amber-500/20 overflow-hidden shadow-lg">
+          <div class="p-4 bg-neutral-900/50 border-b border-gray-700">
+            <h2 class="text-xl font-bold">Pedidos Recentes</h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-left">
+              <thead class="bg-neutral-700 text-gray-300 sticky top-0">
+                <tr>
+                  <th class="p-3 w-1/12">Nº do Pedido</th>
+                  <th class="p-3 w-2/12">Data</th>
+                  <th class="p-3 w-4/12">Resumo</th>
+                  <th class="p-3 w-2/12">Total</th>
+                  <th class="p-3 w-3/12 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaHistoricoVendas">
+                <tr>
+                  <td colspan="5" class="p-4 text-center text-gray-500 italic">Carregando histórico...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="historico-pagination" class="board-pagination" style="display:none">
+            <button onclick="mudarPaginaHistorico(-1)" id="historico-pagina-anterior" class="board-page-btn" disabled>
+              <i class="fa fa-chevron-left"></i> Anterior
+            </button>
+            <span id="historico-page-info" class="board-page-info"></span>
+            <button onclick="mudarPaginaHistorico(1)" id="historico-pagina-proxima" class="board-page-btn" disabled>
+              Próxima <i class="fa fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="cadastros" class="page-content space-y-6 hidden fade-in">
+        <h1 class="text-3xl font-bold text-white">Cadastros</h1>
+
+        <div class="flex gap-2 border-b border-neutral-700">
+          <button onclick="mostrarAbaCadastros('produtos')" id="aba-cadastros-produtos" class="report-tab active"><i
+              class="fa fa-book-open mr-1"></i> Produtos</button>
+          <button onclick="mostrarAbaCadastros('clientes')" id="aba-cadastros-clientes" class="report-tab"><i
+              class="fa fa-users mr-1"></i> Clientes</button>
+          <button onclick="mostrarAbaCadastros('fornecedores')" id="aba-cadastros-fornecedores" class="report-tab"><i
+              class="fa fa-truck mr-1"></i> Fornecedores</button>
+        </div>
+
+        <!-- ABA PRODUTOS -->
+        <div id="cadastros-aba-produtos" class="space-y-4">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-1 bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+              <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                <span id="cad-produto-title">Adicionar Novo Produto</span>
+                <button id="cad-btn-cancel-edit" onclick="cancelEditCadastro()"
+                  class="text-sm text-gray-400 hover:text-white hidden transition-colors">
+                  <i class="fa fa-times"></i> Cancelar
+                </button>
+              </h2>
+              <form id="cad-form-estoque" onsubmit="event.preventDefault(); addProdutoCadastro();" class="space-y-4">
+                <input type="hidden" id="cad-produto-id">
+                <div>
+                  <label for="cad-produto-nome" class="text-sm text-gray-400 block mb-1">Nome do Produto</label>
+                  <input id="cad-produto-nome" type="text" placeholder="Ex: Pod Mango Ice, Refil Mint"
+                    class="input-field">
+                </div>
+                <div>
+                  <label for="cad-produto-descricao" class="text-sm text-gray-400 block mb-1">Descrição <span
+                      class="text-xs text-gray-600">(exibida no cardálogo do cliente)</span></label>
+                  <input id="cad-produto-descricao" type="text"
+                    placeholder="Ex: Pod descartável premium com sabor selecionado." class="input-field">
+                </div>
+                <div>
+                  <label for="cad-produto-imagem" class="text-sm text-gray-400 block mb-1">URL da Imagem</label>
+                  <input id="cad-produto-imagem" type="text" placeholder="https://..." class="input-field">
+                </div>
+                <div>
+                  <label for="cad-produto-marca" class="text-sm text-gray-400 block mb-1">Marca <span
+                      class="text-xs text-gray-600">(controle interno)</span></label>
+                  <select id="cad-produto-marca" class="input-field">
+                    <option value="">Selecione uma marca cadastrada...</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="cad-produto-grupo" class="text-sm text-gray-400 block mb-1">Grupo <span
+                      class="text-xs text-gray-600">(controle interno)</span></label>
+                  <select id="cad-produto-grupo" class="input-field">
+                    <option value="">Selecione um grupo cadastrado...</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="cad-produto-subgrupo" class="text-sm text-gray-400 block mb-1">Subgrupo <span
+                      class="text-xs text-gray-600">(controle interno)</span></label>
+                  <select id="cad-produto-subgrupo" class="input-field">
+                    <option value="">Selecione um subgrupo cadastrado...</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="cad-produto-codigo-barras" class="text-sm text-gray-400 block mb-1">Código de Barras
+                    (EAN-13) <span class="text-xs text-gray-600">(controle interno —
+                      estoque/almoxarifado)</span></label>
+                  <input id="cad-produto-codigo-barras" type="text" inputmode="numeric" maxlength="13"
+                    placeholder="13 dígitos — Ex: 7891234567890" class="input-field"
+                    oninput="tratarInputCodigoBarras(this)">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label for="cad-produto-preco" class="text-sm text-gray-400 block mb-1">Preço (R$)</label>
+                    <input id="cad-produto-preco" type="number" step="0.01" placeholder="Ex: 45.00" class="input-field">
+                  </div>
+                  <div>
+                    <label for="cad-produto-qtd" class="text-sm text-gray-400 block mb-1">Quantidade em Estoque</label>
+                    <input id="cad-produto-qtd" type="number" placeholder="Ex: 50" class="input-field">
+                  </div>
+                </div>
+                <button type="submit" id="cad-btn-salvar-produto"
+                  class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-3 rounded-lg transition-colors mt-2">
+                  SALVAR PRODUTO
+                </button>
+              </form>
+            </div>
+            <div class="lg:col-span-2 bg-neutral-800 rounded-xl border border-amber-500/20 overflow-hidden shadow-lg">
+              <div class="p-4 bg-neutral-900/50 border-b border-gray-700 space-y-3">
+                <h2 class="text-xl font-bold">Produtos Cadastrados</h2>
+                <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300">Filtros</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-sm text-gray-400 block mb-1">Buscar por nome</label>
+                    <input id="cad-estq-busca-nome" type="text" placeholder="Digite o nome do produto..."
+                      class="input-field" oninput="filtrarCadastroEstoqueBusca()">
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-400 block mb-1">Buscar por ID</label>
+                    <input id="cad-estq-busca-codigo" type="number" min="1" placeholder="Ex.: 001" class="input-field"
+                      oninput="filtrarCadastroEstoqueBusca()">
+                  </div>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Status</label>
+                  <div class="flex flex-wrap gap-2">
+                    <button onclick="filtrarCadastroEstoqueStatus('todos')" id="cad-estq-status-todos"
+                      class="report-filter active">Todos</button>
+                    <button onclick="filtrarCadastroEstoqueStatus('liberados')" id="cad-estq-status-liberados"
+                      class="report-filter">Liberados</button>
+                    <button onclick="filtrarCadastroEstoqueStatus('bloqueados')" id="cad-estq-status-bloqueados"
+                      class="report-filter">Bloqueados</button>
+                  </div>
+                </div>
+              </div>
+              <div class="overflow-y-auto h-96">
+                <table class="w-full text-left">
+                  <thead class="bg-neutral-700 text-gray-300 sticky top-0">
+                    <tr>
+                      <th class="p-3">ID</th>
+                      <th class="p-3">Produto</th>
+                      <th class="p-3">Cód. Barras</th>
+                      <th class="p-3">Marca</th>
+                      <th class="p-3">Grupo</th>
+                      <th class="p-3">Subgrupo</th>
+                      <th class="p-3">Preço</th>
+                      <th class="p-3 text-center">Qtd.</th>
+                      <th class="p-3 text-center">Status</th>
+                      <th class="p-3 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cad-tabelaEstoque">
+                    <tr>
+                      <td colspan="10" class="p-4 text-center text-gray-500 italic">Carregando produtos...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="cad-estoque-pagination" class="board-pagination" style="display:none">
+                <button onclick="mudarPaginaCadastroEstoque(-1)" id="cad-estoque-pagina-anterior" class="board-page-btn"
+                  disabled>
+                  <i class="fa fa-chevron-left"></i> Anterior
+                </button>
+                <span id="cad-estoque-page-info" class="board-page-info"></span>
+                <button onclick="mudarPaginaCadastroEstoque(1)" id="cad-estoque-pagina-proxima" class="board-page-btn"
+                  disabled>
+                  Próxima <i class="fa fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA CLIENTES -->
+        <div id="cadastros-aba-clientes" class="space-y-4 hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-1 bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+              <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                <span id="cad-cliente-title">Adicionar Novo Cliente</span>
+                <button id="cad-btn-cancel-edit-cliente" onclick="cancelEditClienteCadastro()"
+                  class="text-sm text-gray-400 hover:text-white hidden transition-colors">
+                  <i class="fa fa-times"></i> Cancelar
+                </button>
+              </h2>
+              <form id="cad-form-clientes" onsubmit="event.preventDefault(); addClienteCadastro();" class="space-y-4">
+                <input type="hidden" id="cad-cliente-id">
+                <div>
+                  <label for="cad-cliente-nome" class="text-sm text-gray-400 block mb-1">Nome Completo *</label>
+                  <input id="cad-cliente-nome" type="text" placeholder="Nome Completo" class="input-field">
+                </div>
+                <div>
+                  <label for="cad-cliente-tel" class="text-sm text-gray-400 block mb-1">Telefone/WhatsApp *</label>
+                  <input id="cad-cliente-tel" type="text" placeholder="(99) 99999-9999" class="input-field">
+                </div>
+                <div>
+                  <label for="cad-cliente-email" class="text-sm text-gray-400 block mb-1">E-mail</label>
+                  <input id="cad-cliente-email" type="email" placeholder="email@exemplo.com" class="input-field">
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                  <div class="col-span-2">
+                    <label for="cad-cliente-endereco" class="text-sm text-gray-400 block mb-1">Endereço (Rua/Av)</label>
+                    <input id="cad-cliente-endereco" type="text" placeholder="Rua das Flores" class="input-field">
+                  </div>
+                  <div>
+                    <label for="cad-cliente-numero" class="text-sm text-gray-400 block mb-1">Nº</label>
+                    <input id="cad-cliente-numero" type="text" placeholder="123" class="input-field">
+                  </div>
+                </div>
+                <div>
+                  <label for="cad-cliente-cep" class="text-sm text-gray-400 block mb-1">CEP</label>
+                  <input id="cad-cliente-cep" type="text" placeholder="00000-000" class="input-field">
+                </div>
+                <button type="submit"
+                  class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-3 rounded-lg transition-colors mt-2">
+                  SALVAR CLIENTE
+                </button>
+              </form>
+            </div>
+            <div class="lg:col-span-2 bg-neutral-800 rounded-xl border border-amber-500/20 overflow-hidden shadow-lg">
+              <div class="p-4 bg-neutral-900/50 border-b border-gray-700 space-y-3">
+                <h2 class="text-xl font-bold">Clientes Cadastrados</h2>
+                <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300">Filtros</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-sm text-gray-400 block mb-1">Buscar por nome</label>
+                    <input id="cad-cli-busca-nome" type="text" placeholder="Digite o nome do cliente..."
+                      class="input-field" oninput="filtrarCadastroClientesBusca()">
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-400 block mb-1">Buscar por ID</label>
+                    <input id="cad-cli-busca-codigo" type="number" min="1" placeholder="Ex.: 001" class="input-field"
+                      oninput="filtrarCadastroClientesBusca()">
+                  </div>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Status</label>
+                  <div class="flex flex-wrap gap-2">
+                    <button onclick="filtrarCadastroClientesStatus('todos')" id="cad-cli-status-todos"
+                      class="report-filter active">Todos</button>
+                    <button onclick="filtrarCadastroClientesStatus('liberados')" id="cad-cli-status-liberados"
+                      class="report-filter">Liberados</button>
+                    <button onclick="filtrarCadastroClientesStatus('bloqueados')" id="cad-cli-status-bloqueados"
+                      class="report-filter">Bloqueados</button>
+                  </div>
+                </div>
+              </div>
+              <div class="overflow-y-auto h-96">
+                <table class="w-full text-left">
+                  <thead class="bg-neutral-700 text-gray-300 sticky top-0">
+                    <tr>
+                      <th class="p-3 w-1/12">ID</th>
+                      <th class="p-3 w-1/5">Nome</th>
+                      <th class="p-3 w-1/5">Telefone</th>
+                      <th class="p-3 w-1/5">E-mail</th>
+                      <th class="p-3 w-2/5">Endereço</th>
+                      <th class="p-3 text-center">Status</th>
+                      <th class="p-3 w-1/12 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cad-tabelaClientes">
+                    <tr>
+                      <td colspan="7" class="p-4 text-center text-gray-500 italic">Carregando clientes...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="cad-clientes-pagination" class="board-pagination" style="display:none">
+                <button onclick="mudarPaginaCadastroClientes(-1)" id="cad-clientes-pagina-anterior"
+                  class="board-page-btn" disabled>
+                  <i class="fa fa-chevron-left"></i> Anterior
+                </button>
+                <span id="cad-clientes-page-info" class="board-page-info"></span>
+                <button onclick="mudarPaginaCadastroClientes(1)" id="cad-clientes-pagina-proxima" class="board-page-btn"
+                  disabled>
+                  Próxima <i class="fa fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA FORNECEDORES -->
+        <div id="cadastros-aba-fornecedores" class="space-y-4 hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+              <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                <span id="cad-fornecedor-title">Cadastrar Fornecedor</span>
+                <button id="cad-btn-cancel-edit-fornecedor" onclick="cancelEditFornecedorCadastro()"
+                  class="text-sm text-gray-400 hover:text-white hidden transition-colors">
+                  <i class="fa fa-times"></i> Cancelar
+                </button>
+              </h2>
+              <form id="cad-form-fornecedores" onsubmit="event.preventDefault(); salvarFornecedorCadastro();"
+                class="space-y-4">
+                <input type="hidden" id="cad-fornecedor-id">
+                <div>
+                  <label for="cad-fornecedor-nome" class="text-sm text-gray-400 block mb-1">Nome / Razão Social
+                    *</label>
+                  <input id="cad-fornecedor-nome" type="text" placeholder="Ex.: Distribuidora X" class="input-field"
+                    required>
+                </div>
+                <div>
+                  <label for="cad-fornecedor-documento" class="text-sm text-gray-400 block mb-1">CNPJ / CPF</label>
+                  <input id="cad-fornecedor-documento" type="text" placeholder="00.000.000/0000-00" class="input-field">
+                </div>
+                <div>
+                  <label for="cad-fornecedor-contato" class="text-sm text-gray-400 block mb-1">Contato</label>
+                  <input id="cad-fornecedor-contato" type="text" placeholder="Telefone / WhatsApp" class="input-field">
+                </div>
+                <div>
+                  <label for="cad-fornecedor-email" class="text-sm text-gray-400 block mb-1">E-mail</label>
+                  <input id="cad-fornecedor-email" type="email" placeholder="email@exemplo.com" class="input-field">
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                  <div class="col-span-2">
+                    <label for="cad-fornecedor-endereco" class="text-sm text-gray-400 block mb-1">Endereço
+                      (Rua/Av)</label>
+                    <input id="cad-fornecedor-endereco" type="text" placeholder="Rua das Flores" class="input-field">
+                  </div>
+                  <div>
+                    <label for="cad-fornecedor-numero" class="text-sm text-gray-400 block mb-1">Nº</label>
+                    <input id="cad-fornecedor-numero" type="text" placeholder="123" class="input-field">
+                  </div>
+                </div>
+                <div>
+                  <label for="cad-fornecedor-observacao" class="text-sm text-gray-400 block mb-1">Observações</label>
+                  <textarea id="cad-fornecedor-observacao" rows="2" class="input-field"
+                    placeholder="Anotações opcionais"></textarea>
+                </div>
+                <button type="submit"
+                  class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-2 rounded-lg transition-colors">
+                  SALVAR FORNECEDOR
+                </button>
+              </form>
+            </div>
+            <div class="lg:col-span-2 bg-neutral-800 rounded-xl border border-amber-500/20 overflow-hidden shadow-lg">
+              <div class="p-4 bg-neutral-900/50 border-b border-gray-700 space-y-3">
+                <h2 class="text-xl font-bold">Fornecedores Cadastrados</h2>
+                <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300">Filtros</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-sm text-gray-400 block mb-1">Buscar por nome</label>
+                    <input id="cad-forn-busca-nome" type="text" placeholder="Digite o nome do fornecedor..."
+                      class="input-field" oninput="filtrarCadastroFornecedoresBusca()">
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-400 block mb-1">Buscar por ID</label>
+                    <input id="cad-forn-busca-codigo" type="number" min="1" placeholder="Ex.: 001" class="input-field"
+                      oninput="filtrarCadastroFornecedoresBusca()">
+                  </div>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Status</label>
+                  <div class="flex flex-wrap gap-2">
+                    <button onclick="filtrarCadastroFornecedoresStatus('todos')" id="cad-forn-status-todos"
+                      class="report-filter active">Todos</button>
+                    <button onclick="filtrarCadastroFornecedoresStatus('liberados')" id="cad-forn-status-liberados"
+                      class="report-filter">Liberados</button>
+                    <button onclick="filtrarCadastroFornecedoresStatus('bloqueados')" id="cad-forn-status-bloqueados"
+                      class="report-filter">Bloqueados</button>
+                  </div>
+                </div>
+              </div>
+              <div class="overflow-y-auto h-96">
+                <table class="w-full text-left">
+                  <thead class="bg-neutral-700 text-gray-300 sticky top-0">
+                    <tr>
+                      <th class="p-3">ID</th>
+                      <th class="p-3">Nome</th>
+                      <th class="p-3">CNPJ / CPF</th>
+                      <th class="p-3">Contato</th>
+                      <th class="p-3">E-mail</th>
+                      <th class="p-3">Endereço</th>
+                      <th class="p-3 text-center">Status</th>
+                      <th class="p-3 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cad-tabelaFornecedores">
+                    <tr>
+                      <td colspan="8" class="p-4 text-center text-gray-500 italic">Carregando fornecedores...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="cad-fornecedores-pagination" class="board-pagination" style="display:none">
+                <button onclick="mudarPaginaCadastroFornecedores(-1)" id="cad-fornecedores-pagina-anterior"
+                  class="board-page-btn" disabled>
+                  <i class="fa fa-chevron-left"></i> Anterior
+                </button>
+                <span id="cad-fornecedores-page-info" class="board-page-info"></span>
+                <button onclick="mudarPaginaCadastroFornecedores(1)" id="cad-fornecedores-pagina-proxima"
+                  class="board-page-btn" disabled>
+                  Próxima <i class="fa fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+
+      <div id="entradas" class="page-content space-y-6 hidden fade-in">
+        <h1 class="text-3xl font-bold text-white">Entradas de Mercadoria</h1>
+
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-xl font-bold text-white">Entradas registradas</h2>
+            <p class="text-sm text-gray-400">Rascunhos não alteram o estoque. Confirme para lançar a movimentação.</p>
+          </div>
+          <button onclick="novaEntrada()"
+            class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+            <i class="fa fa-plus mr-1"></i> NOVA ENTRADA
+          </button>
+        </div>
+
+        <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+          <div class="mb-4">
+            <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300 mb-3">Filtros</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">Status</label>
+                <select id="entradas-filtro-status" class="input-field" onchange="filtrarEntradas()">
+                  <option value="">Todos</option>
+                  <option value="RASCUNHO">Rascunho</option>
+                  <option value="CONFIRMADA">Confirmada</option>
+                  <option value="ESTORNADA">Estornada</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">Fornecedor</label>
+                <select id="entradas-filtro-fornecedor" class="input-field" onchange="filtrarEntradas()">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">Buscar (nota / fornecedor)</label>
+                <input id="entradas-filtro-busca" type="text" class="input-field" oninput="filtrarEntradas()">
+              </div>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead class="bg-neutral-700 text-gray-300">
+                <tr>
+                  <th class="p-3 w-1/12">Nº</th>
+                  <th class="p-3 w-1/6">Fornecedor</th>
+                  <th class="p-3">Nota Fiscal</th>
+                  <th class="p-3">Data Entrada</th>
+                  <th class="p-3">Itens</th>
+                  <th class="p-3 w-1/12">Total</th>
+                  <th class="p-3 text-center">Status</th>
+                  <th class="p-3 w-1/12 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaEntradas">
+                <tr>
+                  <td colspan="8" class="p-4 text-center text-gray-500 italic">Carregando entradas...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="entradas-pagination" class="board-pagination" style="display:none">
+            <button onclick="mudarPaginaEntradas(-1)" id="entradas-pagina-anterior" class="board-page-btn" disabled>
+              <i class="fa fa-chevron-left"></i> Anterior
+            </button>
+            <span id="entradas-page-info" class="board-page-info"></span>
+            <button onclick="mudarPaginaEntradas(1)" id="entradas-pagina-proxima" class="board-page-btn" disabled>
+              Próxima <i class="fa fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="contas" class="page-content space-y-6 hidden fade-in">
+        <h1 class="text-3xl font-bold text-white">Contas a Pagar</h1>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 border-b border-neutral-700">
+          <button onclick="mostrarAbaContas('emAberto')" id="aba-contas-emAberto" class="report-tab active">Em
+            Aberto</button>
+          <button onclick="mostrarAbaContas('pagas')" id="aba-contas-pagas" class="report-tab">Pagas</button>
+        </div>
+
+        <!-- ABA EM ABERTO -->
+        <div id="contas-aba-emAberto" class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-xl font-bold text-white">Contas pendentes</h2>
+              <p class="text-sm text-gray-400">Contas geradas a partir de entradas ou lançadas avulsas. Baixe para
+                registrar o débito no caixa.</p>
+            </div>
+            <button onclick="novaContaAvulsa()"
+              class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+              <i class="fa fa-plus mr-1"></i> NOVA CONTA AVULSA
+            </button>
+          </div>
+
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <div class="mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300 mb-3">Filtros</h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Fornecedor</label>
+                  <select id="contas-filtro-fornecedor" class="input-field" onchange="filtrarContasPagar()">
+                    <option value="">Todos</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Buscar (nº / descrição / fornecedor)</label>
+                  <input id="contas-filtro-busca" type="text" class="input-field" oninput="filtrarContasPagar()">
+                </div>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left">
+                <thead class="bg-neutral-700 text-gray-300">
+                  <tr>
+                    <th class="p-3 w-1/12">Nº</th>
+                    <th class="p-3">Fornecedor</th>
+                    <th class="p-3">Descrição</th>
+                    <th class="p-3">Vencimento</th>
+                    <th class="p-3">Forma</th>
+                    <th class="p-3">Valor</th>
+                    <th class="p-3">Pago</th>
+                    <th class="p-3">Saldo</th>
+                    <th class="p-3 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="contas-em-aberto-tbody">
+                  <tr>
+                    <td colspan="9" class="p-4 text-center text-gray-500 italic">Carregando contas...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="contas-em-aberto-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaContasEmAberto(-1)" id="contas-em-aberto-pagina-anterior"
+                class="board-page-btn" disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="contas-em-aberto-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaContasEmAberto(1)" id="contas-em-aberto-pagina-proxima" class="board-page-btn"
+                disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA PAGAS -->
+        <div id="contas-aba-pagas" class="space-y-4 hidden">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-xl font-bold text-white">Histórico de contas pagas</h2>
+              <p class="text-sm text-gray-400">Contas quitadas. Cada baixa registra um débito no fluxo de caixa.</p>
+            </div>
+          </div>
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left">
+                <thead class="bg-neutral-700 text-gray-300">
+                  <tr>
+                    <th class="p-3 w-1/12">Nº</th>
+                    <th class="p-3">Fornecedor</th>
+                    <th class="p-3">Descrição</th>
+                    <th class="p-3">Vencimento</th>
+                    <th class="p-3">Forma</th>
+                    <th class="p-3">Valor</th>
+                    <th class="p-3">Pago</th>
+                    <th class="p-3">Data Pagamento</th>
+                    <th class="p-3 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="contas-pagas-tbody">
+                  <tr>
+                    <td colspan="9" class="p-4 text-center text-gray-500 italic">Carregando contas...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="contas-pagas-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaContasPagas(-1)" id="contas-pagas-pagina-anterior" class="board-page-btn"
+                disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="contas-pagas-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaContasPagas(1)" id="contas-pagas-pagina-proxima" class="board-page-btn"
+                disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <div id="relatorios" class="page-content space-y-6 hidden fade-in">
+        <h1 class="text-3xl font-bold text-white">Relatórios</h1>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 border-b border-neutral-700">
+          <button onclick="mostrarAbaRelatorio('vendas')" id="aba-rel-vendas" class="report-tab active">Relatório de
+            Vendas</button>
+          <button onclick="mostrarAbaRelatorio('estoque')" id="aba-rel-estoque" class="report-tab">Relatório de
+            Estoque</button>
+          <button onclick="mostrarAbaRelatorio('entradas')" id="aba-rel-entradas" class="report-tab">Relatório de
+            Entradas</button>
+          <button onclick="mostrarAbaRelatorio('clientes')" id="aba-rel-clientes" class="report-tab">Relatório de
+            Clientes</button>
+          <button onclick="mostrarAbaRelatorio('fornecedores')" id="aba-rel-fornecedores" class="report-tab">Relatório
+            de Fornecedores</button>
+          <button onclick="mostrarAbaRelatorio('caixa')" id="aba-rel-caixa" class="report-tab">Fechamento de
+            Caixa</button>
+          <button onclick="mostrarAbaRelatorio('contas')" id="aba-rel-contas" class="report-tab">Relatório de Contas a
+            Pagar</button>
+        </div>
+
+        <!-- ABA VENDAS -->
+        <div id="rel-vendas" class="space-y-4">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-chart-line text-amber-500"></i> Relatório de Vendas
+            </h2>
+            <div class="mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300 mb-3">Filtros</h3>
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Data inicial</label>
+                  <input id="vendas-rel-inicio" type="date" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Data final</label>
+                  <input id="vendas-rel-fim" type="date" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Nº do pedido</label>
+                  <input id="vendas-rel-pedido" type="number" min="1" placeholder="Ex.: 27" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Cliente</label>
+                  <input id="vendas-rel-cliente" type="text" placeholder="Digite o nome do cliente..."
+                    class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Status</label>
+                  <select id="vendas-rel-status" class="input-field">
+                    <option value="">Todos os status</option>
+                    <option value="Em Preparação">Em Preparação</option>
+                    <option value="Saiu para Entrega">Saiu para Entrega</option>
+                    <option value="Entregue">Entregue</option>
+                    <option value="Cancelado">Cancelado</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Forma de pagamento</label>
+                  <select id="vendas-rel-forma" class="input-field">
+                    <option value="">Todas as formas</option>
+                    <option value="PIX">PIX</option>
+                    <option value="Cartão">Cartão</option>
+                    <option value="Dinheiro">Dinheiro</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-3 items-center">
+                <button onclick="gerarRelatorioVendas()"
+                  class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+                  GERAR
+                </button>
+                <button onclick="exportarRelatorioVendasPDF()"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg transition-colors">
+                  <i class="fa fa-file-pdf mr-1"></i> EXPORTAR PDF
+                </button>
+              </div>
+            </div>
+            <p id="vendas-rel-info" class="text-sm text-gray-400 mb-3"></p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">Pedido</th>
+                    <th class="py-2 pr-4">Data</th>
+                    <th class="py-2 pr-4">Cliente</th>
+                    <th class="py-2 pr-4 text-center">Itens</th>
+                    <th class="py-2 pr-4 text-right">Total</th>
+                    <th class="py-2 pr-4">Status</th>
+                    <th class="py-2 pr-4">Forma</th>
+                    <th class="py-2">Produtos</th>
+                  </tr>
+                </thead>
+                <tbody id="vendas-rel-corpo">
+                  <tr>
+                    <td colspan="8" class="py-8 text-center text-gray-500">Clique em <b>GERAR</b> para exibir as vendas.
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot id="vendas-rel-rodape"></tfoot>
+              </table>
+            </div>
+            <div id="vendas-rel-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaRelVendas(-1)" id="vendas-rel-pagina-anterior" class="board-page-btn"
+                disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="vendas-rel-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaRelVendas(1)" id="vendas-rel-pagina-proxima" class="board-page-btn" disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Detalhe dos itens de uma venda -->
+          <div id="vendas-rel-detalhe"
+            class="hidden bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h3 id="vendas-rel-detalhe-titulo" class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-list text-amber-500"></i> Produtos da Venda
+            </h3>
+            <div id="vendas-rel-resumo" class="mb-4"></div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">#</th>
+                    <th class="py-2 pr-4">Produto</th>
+                    <th class="py-2 pr-4">Marca</th>
+                    <th class="py-2 pr-4">Grupo</th>
+                    <th class="py-2 pr-4">Subgrupo</th>
+                    <th class="py-2 pr-4 text-right">Qtd</th>
+                    <th class="py-2 pr-4 text-right">Preço unit.</th>
+                    <th class="py-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="vendas-rel-itens">
+                  <tr>
+                    <td colspan="8" class="py-6 text-center text-gray-500 italic">Selecione uma venda para ver os
+                      produtos.</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div id="vendas-rel-itens-pagination" style="display:none; margin-top:16px;">
+                <div class="board-pagination">
+                  <button onclick="mudarPaginaRelVendasItens(-1)" id="vendas-rel-itens-pagina-anterior"
+                    class="board-page-btn" disabled>
+                    <i class="fa fa-chevron-left"></i> Anterior
+                  </button>
+                  <span id="vendas-rel-itens-page-info" class="board-page-info"></span>
+                  <button onclick="mudarPaginaRelVendasItens(1)" id="vendas-rel-itens-pagina-proxima"
+                    class="board-page-btn" disabled>
+                    Próxima <i class="fa fa-chevron-right"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA ESTOQUE -->
+        <div id="rel-estoque" class="space-y-4 hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-boxes-stacked text-amber-500"></i> Relatório de Estoque
+            </h2>
+            <div class="mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300 mb-3">Filtros</h3>
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Situação</label>
+                  <div class="flex flex-wrap gap-2">
+                    <button onclick="filtrarRelatorioEstoque('todos')" id="estq-filtro-todos"
+                      class="report-filter active">Todos</button>
+                    <button onclick="filtrarRelatorioEstoque('baixo')" id="estq-filtro-baixo"
+                      class="report-filter">Estoque Baixo</button>
+                    <button onclick="filtrarRelatorioEstoque('sem')" id="estq-filtro-sem" class="report-filter">Sem
+                      Estoque</button>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Status</label>
+                  <div class="flex flex-wrap gap-2">
+                    <button onclick="filtrarRelatorioEstoqueStatus('todos')" id="estq-rel-status-todos"
+                      class="report-filter active">Todos</button>
+                    <button onclick="filtrarRelatorioEstoqueStatus('liberados')" id="estq-rel-status-liberados"
+                      class="report-filter">Liberados</button>
+                    <button onclick="filtrarRelatorioEstoqueStatus('bloqueados')" id="estq-rel-status-bloqueados"
+                      class="report-filter">Bloqueados</button>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Produto</label>
+                  <select id="estoque-rel-produto" class="input-field">
+                    <option value="">Todos os produtos</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">ID</label>
+                  <input id="estoque-rel-codigo" type="number" min="1" placeholder="Ex.: 001" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Marca</label>
+                  <select id="estoque-rel-marca" class="input-field">
+                    <option value="">Todas as marcas</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Grupo</label>
+                  <select id="estoque-rel-grupo" class="input-field">
+                    <option value="">Todos os grupos</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Subgrupo</label>
+                  <select id="estoque-rel-subgrupo" class="input-field">
+                    <option value="">Todos os subgrupos</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-3 items-center">
+                <button onclick="gerarRelatorioEstoque()"
+                  class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+                  GERAR
+                </button>
+                <button onclick="exportarRelatorioEstoquePDF()"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg transition-colors">
+                  <i class="fa fa-file-pdf mr-1"></i> EXPORTAR PDF
+                </button>
+              </div>
+            </div>
+            <p id="estoque-rel-info" class="text-sm text-gray-400 mb-3"></p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">ID</th>
+                    <th class="py-2 pr-4">Produto</th>
+                    <th class="py-2 pr-4">Marca</th>
+                    <th class="py-2 pr-4">Grupo</th>
+                    <th class="py-2 pr-4">Subgrupo</th>
+                    <th class="py-2 pr-4 text-right">Preço</th>
+                    <th class="py-2 pr-4 text-right">Qtd</th>
+                    <th class="py-2">Situação</th>
+                  </tr>
+                </thead>
+                <tbody id="estoque-rel-corpo">
+                  <tr>
+                    <td colspan="8" class="py-8 text-center text-gray-500">Clique em <b>GERAR</b> para exibir o
+                      relatório de estoque.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="estoque-rel-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaRelEstoque(-1)" id="estoque-rel-pagina-anterior" class="board-page-btn"
+                disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="estoque-rel-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaRelEstoque(1)" id="estoque-rel-pagina-proxima" class="board-page-btn"
+                disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA ENTRAADS -->
+        <div id="rel-entradas" class="space-y-4 hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-cart-flatbed text-amber-500"></i> Relatório de Entradas
+            </h2>
+            <div class="mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300 mb-3">Filtros</h3>
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Data inicial</label>
+                  <input id="entradas-rel-inicio" type="date" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Data final</label>
+                  <input id="entradas-rel-fim" type="date" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Sequência da entrada</label>
+                  <input id="entradas-rel-seq" type="number" min="1" placeholder="Ex.: 001" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Fornecedor</label>
+                  <select id="entradas-rel-fornecedor" class="input-field">
+                    <option value="">Todos os fornecedores</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Status</label>
+                  <select id="entradas-rel-status" class="input-field">
+                    <option value="">Todos os status</option>
+                    <option value="RASCUNHO">Rascunho</option>
+                    <option value="CONFIRMADA">Confirmada</option>
+                    <option value="ESTORNADA">Estornada</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-3 items-center">
+                <button onclick="gerarRelatorioEntradas()"
+                  class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+                  GERAR
+                </button>
+                <button onclick="exportarRelatorioEntradasPDF()"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg transition-colors">
+                  <i class="fa fa-file-pdf mr-1"></i> EXPORTAR PDF
+                </button>
+              </div>
+            </div>
+            <p id="entradas-rel-info" class="text-sm text-gray-400 mb-3"></p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">Seq</th>
+                    <th class="py-2 pr-4">Data</th>
+                    <th class="py-2 pr-4">Fornecedor</th>
+                    <th class="py-2 pr-4">Nota</th>
+                    <th class="py-2 pr-4 text-center">Itens</th>
+                    <th class="py-2 pr-4 text-right">Total</th>
+                    <th class="py-2 pr-4">Status</th>
+                    <th class="py-2">Produtos</th>
+                  </tr>
+                </thead>
+                <tbody id="entradas-rel-corpo">
+                  <tr>
+                    <td colspan="8" class="py-8 text-center text-gray-500">Clique em <b>GERAR</b> para exibir as
+                      entradas.</td>
+                  </tr>
+                </tbody>
+                <tfoot id="entradas-rel-rodape"></tfoot>
+              </table>
+            </div>
+            <div id="entradas-rel-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaRelEntradas(-1)" id="entradas-rel-pagina-anterior" class="board-page-btn"
+                disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="entradas-rel-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaRelEntradas(1)" id="entradas-rel-pagina-proxima" class="board-page-btn"
+                disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Detalhe dos itens de uma entrada -->
+          <div id="entradas-rel-detalhe"
+            class="hidden bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h3 id="entradas-rel-detalhe-titulo" class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-list text-amber-500"></i> Produtos da Entrada
+            </h3>
+            <div id="entradas-rel-resumo" class="mb-4"></div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">#</th>
+                    <th class="py-2 pr-4">Produto</th>
+                    <th class="py-2 pr-4">Marca</th>
+                    <th class="py-2 pr-4">Grupo</th>
+                    <th class="py-2 pr-4">Subgrupo</th>
+                    <th class="py-2 pr-4 text-right">Qtd</th>
+                    <th class="py-2 pr-4 text-right">Custo unit.</th>
+                    <th class="py-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="entradas-rel-itens">
+                  <tr>
+                    <td colspan="8" class="py-6 text-center text-gray-500 italic">Selecione uma entrada para ver os
+                      produtos.</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div id="entradas-rel-itens-pagination" style="display:none; margin-top:16px;">
+                <div class="board-pagination">
+                  <button onclick="mudarPaginaRelEntradasItens(-1)" id="entradas-rel-itens-pagina-anterior"
+                    class="board-page-btn" disabled>
+                    <i class="fa fa-chevron-left"></i> Anterior
+                  </button>
+                  <span id="entradas-rel-itens-page-info" class="board-page-info"></span>
+                  <button onclick="mudarPaginaRelEntradasItens(1)" id="entradas-rel-itens-pagina-proxima"
+                    class="board-page-btn" disabled>
+                    Próxima <i class="fa fa-chevron-right"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA LISTAGEM DE CLIENTES -->
+        <div id="rel-clientes" class="space-y-4 hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-users text-amber-500"></i> Relatório de Clientes
+            </h2>
+            <div class="mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300 mb-3">Filtros</h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-4">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Status</label>
+                  <div class="flex flex-wrap gap-2">
+                    <button onclick="filtrarRelatorioClientesStatus('todos')" id="cli-rel-status-todos"
+                      class="report-filter active">Todos</button>
+                    <button onclick="filtrarRelatorioClientesStatus('liberados')" id="cli-rel-status-liberados"
+                      class="report-filter">Liberados</button>
+                    <button onclick="filtrarRelatorioClientesStatus('bloqueados')" id="cli-rel-status-bloqueados"
+                      class="report-filter">Bloqueados</button>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Nome</label>
+                  <input id="clientes-rel-nome" type="text" placeholder="Digite o nome do cliente..."
+                    class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">ID</label>
+                  <input id="clientes-rel-codigo" type="number" min="1" placeholder="Ex.: 001" class="input-field">
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-3 items-center">
+                <button onclick="gerarRelatorioClientes()"
+                  class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+                  GERAR
+                </button>
+                <button onclick="exportarRelatorioClientesPDF()"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg transition-colors">
+                  <i class="fa fa-file-pdf mr-1"></i> EXPORTAR PDF
+                </button>
+              </div>
+            </div>
+            <p id="clientes-rel-info" class="text-sm text-gray-400 mb-3"></p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">ID</th>
+                    <th class="py-2 pr-4">Nome</th>
+                    <th class="py-2 pr-4">Telefone</th>
+                    <th class="py-2 pr-4">E-mail</th>
+                    <th class="py-2 pr-4">Endereço</th>
+                    <th class="py-2 pr-4">Pedidos</th>
+                    <th class="py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="clientes-rel-corpo">
+                  <tr>
+                    <td colspan="7" class="py-8 text-center text-gray-500">Clique em <b>GERAR</b> para exibir a listagem
+                      de clientes.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="clientes-rel-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaRelClientes(-1)" id="clientes-rel-pagina-anterior" class="board-page-btn"
+                disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="clientes-rel-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaRelClientes(1)" id="clientes-rel-pagina-proxima" class="board-page-btn"
+                disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA LISTAGEM DE FORNECEDORES -->
+        <div id="rel-fornecedores" class="space-y-4 hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-truck-ramp-box text-amber-500"></i> Relatório de Fornecedores
+            </h2>
+            <div class="mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300 mb-3">Filtros</h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-4">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Status</label>
+                  <div class="flex flex-wrap gap-2">
+                    <button onclick="filtrarRelatorioFornecedoresStatus('todos')" id="forn-rel-status-todos"
+                      class="report-filter active">Todos</button>
+                    <button onclick="filtrarRelatorioFornecedoresStatus('liberados')" id="forn-rel-status-liberados"
+                      class="report-filter">Liberados</button>
+                    <button onclick="filtrarRelatorioFornecedoresStatus('bloqueados')" id="forn-rel-status-bloqueados"
+                      class="report-filter">Bloqueados</button>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Nome</label>
+                  <input id="fornecedores-rel-nome" type="text" placeholder="Digite o nome do fornecedor..."
+                    class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">ID</label>
+                  <input id="fornecedores-rel-codigo" type="number" min="1" placeholder="Ex.: 001" class="input-field">
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-3 items-center">
+                <button onclick="gerarRelatorioFornecedores()"
+                  class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+                  GERAR
+                </button>
+                <button onclick="exportarRelatorioFornecedoresPDF()"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg transition-colors">
+                  <i class="fa fa-file-pdf mr-1"></i> EXPORTAR PDF
+                </button>
+              </div>
+            </div>
+            <p id="fornecedores-rel-info" class="text-sm text-gray-400 mb-3"></p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">ID</th>
+                    <th class="py-2 pr-4">Nome</th>
+                    <th class="py-2 pr-4">CNPJ / CPF</th>
+                    <th class="py-2 pr-4">Contato</th>
+                    <th class="py-2 pr-4">E-mail</th>
+                    <th class="py-2 pr-4">Endereço</th>
+                    <th class="py-2 pr-4">Entradas</th>
+                    <th class="py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="fornecedores-rel-corpo">
+                  <tr>
+                    <td colspan="8" class="py-8 text-center text-gray-500">Clique em <b>GERAR</b> para exibir a listagem
+                      de fornecedores.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="fornecedores-rel-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaRelFornecedores(-1)" id="fornecedores-rel-pagina-anterior"
+                class="board-page-btn" disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="fornecedores-rel-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaRelFornecedores(1)" id="fornecedores-rel-pagina-proxima"
+                class="board-page-btn" disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA FECHAMENTO DE CAIXA -->
+        <div id="rel-caixa" class="space-y-4 hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-wallet text-amber-500"></i> Fechamento de Caixa
+            </h2>
+            <div class="mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300 mb-3">Filtros</h3>
+              <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end mb-4">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Data inicial</label>
+                  <input id="caixa-rel-inicio" type="date" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Data final</label>
+                  <input id="caixa-rel-fim" type="date" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Sequência do caixa</label>
+                  <input id="caixa-rel-seq" type="number" min="1" placeholder="Ex.: 1" class="input-field">
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-3 items-center">
+                <button onclick="gerarRelatorioCaixa()"
+                  class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+                  GERAR
+                </button>
+                <button onclick="exportarRelatorioCaixaPDF()"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg transition-colors">
+                  <i class="fa fa-file-pdf mr-1"></i> EXPORTAR PDF
+                </button>
+              </div>
+            </div>
+            <p id="caixa-rel-info" class="text-sm text-gray-400 mb-3"></p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">Seq</th>
+                    <th class="py-2 pr-4">Aberto em</th>
+                    <th class="py-2 pr-4">Fechado em</th>
+                    <th class="py-2 pr-4">Aberto por</th>
+                    <th class="py-2 pr-4 text-right">Abertura</th>
+                    <th class="py-2 pr-4 text-right">Esperado</th>
+                    <th class="py-2 pr-4 text-right">Contado</th>
+                    <th class="py-2 pr-4 text-right">Diferença</th>
+                    <th class="py-2">Lançamentos</th>
+                  </tr>
+                </thead>
+                <tbody id="caixa-rel-corpo">
+                  <tr>
+                    <td colspan="9" class="py-8 text-center text-gray-500">Clique em <b>GERAR</b> para exibir os
+                      fechamentos de caixa.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="caixa-rel-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaRelCaixa(-1)" id="caixa-rel-pagina-anterior" class="board-page-btn" disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="caixa-rel-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaRelCaixa(1)" id="caixa-rel-pagina-proxima" class="board-page-btn" disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Detalhe dos lançamentos de um fechamento -->
+          <div id="caixa-rel-detalhe" class="hidden bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h3 id="caixa-rel-detalhe-titulo" class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-list text-amber-500"></i> Lançamentos do Caixa
+            </h3>
+            <div id="caixa-rel-resumo" class="mb-4"></div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">Hora</th>
+                    <th class="py-2 pr-4">Tipo</th>
+                    <th class="py-2 pr-4">Forma</th>
+                    <th class="py-2 pr-4 text-right">Valor</th>
+                    <th class="py-2">Observação</th>
+                  </tr>
+                </thead>
+                <tbody id="caixa-rel-lancamentos">
+                  <tr>
+                    <td colspan="5" class="py-6 text-center text-gray-500 italic">Selecione um caixa para ver os
+                      lançamentos.</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div id="caixa-rel-lanc-pagination" class="board-pagination" style="display:none; margin-top:16px;">
+                <button onclick="mudarPaginaRelCaixaLanc(-1)" id="caixa-rel-lanc-pagina-anterior" class="board-page-btn"
+                  disabled>
+                  <i class="fa fa-chevron-left"></i> Anterior
+                </button>
+                <span id="caixa-rel-lanc-page-info" class="board-page-info"></span>
+                <button onclick="mudarPaginaRelCaixaLanc(1)" id="caixa-rel-lanc-pagina-proxima" class="board-page-btn"
+                  disabled>
+                  Próxima <i class="fa fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA CONTAS A PAGAR -->
+        <div id="rel-contas" class="space-y-4 hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-money-bill-wave text-amber-500"></i> Relatório de Contas a Pagar
+            </h2>
+            <div class="mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wide text-gray-300 mb-3">Filtros</h3>
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Situação</label>
+                  <select id="contas-rel-status" class="input-field">
+                    <option value="">Em aberto e pagas</option>
+                    <option value="PENDENTE">Em aberto</option>
+                    <option value="PAGA">Pagas</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Fornecedor</label>
+                  <select id="contas-rel-fornecedor" class="input-field">
+                    <option value="">Todos os fornecedores</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Vencimento de</label>
+                  <input id="contas-rel-inicio" type="date" class="input-field">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">Vencimento até</label>
+                  <input id="contas-rel-fim" type="date" class="input-field">
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-3 items-center">
+                <button onclick="gerarRelatorioContas()"
+                  class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+                  GERAR
+                </button>
+                <button onclick="exportarRelatorioContasPDF()"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg transition-colors">
+                  <i class="fa fa-file-pdf mr-1"></i> EXPORTAR PDF
+                </button>
+              </div>
+            </div>
+            <p id="contas-rel-info" class="text-sm text-gray-400 mb-3"></p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">Nº</th>
+                    <th class="py-2 pr-4">Vencimento</th>
+                    <th class="py-2 pr-4">Fornecedor</th>
+                    <th class="py-2 pr-4">Descrição</th>
+                    <th class="py-2 pr-4">Forma</th>
+                    <th class="py-2 pr-4 text-right">Valor</th>
+                    <th class="py-2 pr-4 text-right">Pago</th>
+                    <th class="py-2 pr-4 text-right">Saldo</th>
+                    <th class="py-2">Situação</th>
+                  </tr>
+                </thead>
+                <tbody id="contas-rel-corpo">
+                  <tr>
+                    <td colspan="9" class="py-8 text-center text-gray-500">Clique em <b>GERAR</b> para exibir as contas
+                      a pagar.</td>
+                  </tr>
+                </tbody>
+                <tfoot id="contas-rel-rodape"></tfoot>
+              </table>
+            </div>
+            <div id="contas-rel-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaRelContas(-1)" id="contas-rel-pagina-anterior" class="board-page-btn"
+                disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="contas-rel-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaRelContas(1)" id="contas-rel-pagina-proxima" class="board-page-btn" disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="config" class="page-content space-y-6 hidden fade-in">
+        <h1 class="text-3xl font-bold text-white">Configurações</h1>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 border-b border-neutral-700">
+          <button onclick="mostrarAbaConfig('estabelecimento')" id="aba-config-estabelecimento"
+            class="report-tab active">Estabelecimento</button>
+          <button onclick="mostrarAbaConfig('catalogo')" id="aba-config-catalogo" class="report-tab">Catálogo</button>
+          <button onclick="mostrarAbaConfig('aparencia')" id="aba-config-aparencia"
+            class="report-tab">Aparência</button>
+          <button onclick="mostrarAbaConfig('conta')" id="aba-config-conta" class="report-tab">Conta e Acesso</button>
+          <button onclick="mostrarAbaConfig('log')" id="aba-config-log" class="report-tab">Log de Operações</button>
+        </div>
+
+        <!-- ABA ESTABELECIMENTO -->
+        <div id="config-aba-estabelecimento" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-store text-amber-500"></i> Loja
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">Nome da Loja</label>
+                <input id="config-loja-nome" type="text" class="input-field" placeholder="Orion Burger">
+              </div>
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">Unidade</label>
+                <input id="config-loja-unidade" type="text" class="input-field" placeholder="Loja Matriz">
+              </div>
+              <button onclick="salvarConfigLoja()"
+                class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-3 rounded-lg transition-colors">
+                SALVAR LOJA
+              </button>
+              <p id="config-status" class="text-xs text-green-400 hidden">Configurações salvas!</p>
+            </div>
+          </div>
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-image text-amber-500"></i> Banner do Cardápio
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">URL da Imagem do Banner - (Dimensões ideais: Largura:
+                  1600 px | Altura: 639 px | Proporção: 2,50:1 | Formato: JPEG)</label>
+                <input id="config-banner-url" type="text" class="input-field" placeholder="https://...">
+              </div>
+              <button onclick="salvarBannerConfig()"
+                class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition-colors">
+                SALVAR BANNER
+              </button>
+              <p id="config-banner-status" class="text-xs text-green-400 hidden">Banner salvo com sucesso!</p>
+            </div>
+          </div>
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-clock text-amber-500"></i> Horário de Funcionamento
+            </h2>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm text-gray-300 block">Controle automático de horário</label>
+                  <p class="text-xs text-gray-500">Ativar/desativar verificação automática de abertura/fechamento</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="config-horario-automatico" class="sr-only peer" checked
+                    onchange="salvarHorarioFuncionamento()">
+                  <div
+                    class="w-11 h-6 bg-neutral-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500">
+                  </div>
+                </label>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-sm text-gray-300 block mb-1">Horário de abertura</label>
+                  <input id="config-horario-abertura" type="time" class="input-field w-full" value="08:00"
+                    onchange="salvarHorarioFuncionamento()">
+                </div>
+                <div>
+                  <label class="text-sm text-gray-300 block mb-1">Horário de fechamento</label>
+                  <input id="config-horario-fechamento" type="time" class="input-field w-full" value="18:00"
+                    onchange="salvarHorarioFuncionamento()">
+                </div>
+              </div>
+              <div id="config-horario-status-loja" class="flex items-center gap-2 p-3 rounded-lg bg-neutral-700/50">
+                <span id="config-horario-status-dot" class="w-3 h-3 rounded-full bg-green-500"></span>
+                <span id="config-horario-status-texto" class="text-sm text-gray-300">Verificando status...</span>
+              </div>
+              <p id="config-horario-status" class="text-xs text-green-400 hidden">Horário salvo!</p>
+            </div>
+          </div>
+          <!-- Card Mesas (Comanda por Mesa) -->
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-utensils text-amber-500"></i> Mesas (Comanda)
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">Quantidade de mesas ativas no estabelecimento</label>
+                <p class="text-xs text-gray-500 mb-2">Define o número total de mesas disponíveis para abertura de
+                  comandas.</p>
+                <div class="flex items-center gap-3">
+                  <input id="mesas-qtd" type="number" min="1" max="100" value="10" class="input-field w-24 text-center">
+                  <span class="text-xs text-gray-400">máx. 100 mesas</span>
+                </div>
+              </div>
+              <button onclick="salvarConfigMesas()"
+                class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-3 rounded-lg transition-colors">
+                SALVAR QUANTIDADE DE MESAS
+              </button>
+              <p id="mesas-config-status" class="text-xs text-green-400 hidden">Configuração salva!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA CATÁLOGO -->
+        <div id="config-aba-catalogo" class="grid grid-cols-1 lg:grid-cols-2 gap-6 hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-eye text-amber-500"></i> Exibição no Cardápio
+            </h2>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm text-gray-300 block">Mostrar estoque disponível</label>
+                  <p class="text-xs text-gray-500">Exibe a quantidade em estoque de cada produto no cardálogo do cliente
+                  </p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="config-mostrar-estoque" class="sr-only peer" checked
+                    onchange="salvarExibicaoCardapio()">
+                  <div
+                    class="w-11 h-6 bg-neutral-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500">
+                  </div>
+                </label>
+              </div>
+              <p id="config-exibicao-status" class="text-xs text-green-400 hidden">Configuração salva!</p>
+            </div>
+          </div>
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-credit-card text-amber-500"></i> Formas de Pagamento
+            </h2>
+            <div class="space-y-4">
+              <div id="lista-config-pagamentos" class="space-y-2"></div>
+              <div class="flex gap-2">
+                <input id="novo-metodo-pagamento" type="text" class="input-field flex-1"
+                  placeholder="Ex: Pix, Cartão, Dinheiro..."
+                  onkeydown="if(event.key==='Enter')adicionarMetodoPagamento()">
+                <button onclick="adicionarMetodoPagamento()"
+                  class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors">
+                  ADICIONAR
+                </button>
+              </div>
+              <p id="config-pagamento-status" class="text-xs text-green-400 hidden">Forma de pagamento salva!</p>
+            </div>
+          </div>
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-tags text-amber-500"></i> Classificação de Produtos
+            </h2>
+            <p class="text-xs text-gray-400 mb-4">Cadastre as opções de <strong>Marca</strong>, <strong>Grupo</strong> e
+              <strong>Subgrupo</strong> que poderão ser vinculadas aos produtos no Cardápio (controle interno).</p>
+            <div class="space-y-5">
+              <div class="space-y-2">
+                <h3 class="text-sm font-bold text-gray-300 flex items-center gap-2">
+                  <i class="fa fa-certificate text-amber-500"></i> Marcas
+                </h3>
+                <div id="lista-config-marcas" class="space-y-2"></div>
+                <div class="flex gap-2">
+                  <input id="novo-marca" type="text" class="input-field flex-1" placeholder="Ex: Ignite, Podz..."
+                    onkeydown="if(event.key==='Enter')adicionarClassificacao('marca')">
+                  <button onclick="adicionarClassificacao('marca')"
+                    class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+                    ADICIONAR
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <h3 class="text-sm font-bold text-gray-300 flex items-center gap-2">
+                  <i class="fa fa-layer-group text-amber-500"></i> Grupos
+                </h3>
+                <div id="lista-config-grupos" class="space-y-2"></div>
+                <div class="flex gap-2">
+                  <input id="novo-grupo" type="text" class="input-field flex-1" placeholder="Ex: Descartável, Refil..."
+                    onkeydown="if(event.key==='Enter')adicionarClassificacao('grupo')">
+                  <button onclick="adicionarClassificacao('grupo')"
+                    class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+                    ADICIONAR
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <h3 class="text-sm font-bold text-gray-300 flex items-center gap-2">
+                  <i class="fa fa-list-ul text-amber-500"></i> Subgrupos
+                </h3>
+                <div id="lista-config-subgrupos" class="space-y-2"></div>
+                <div class="flex gap-2">
+                  <input id="novo-subgrupo" type="text" class="input-field flex-1"
+                    placeholder="Ex: 5000 puffs, 10.000 puffs..."
+                    onkeydown="if(event.key==='Enter')adicionarClassificacao('subgrupo')">
+                  <button onclick="adicionarClassificacao('subgrupo')"
+                    class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+                    ADICIONAR
+                  </button>
+                </div>
+              </div>
+              <p id="config-classificacao-status" class="text-xs text-green-400 hidden">Classificação salva!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA APARÊNCIA -->
+        <div id="config-aba-aparencia" class="grid grid-cols-1 lg:grid-cols-2 gap-6 hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg lg:col-span-2">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-palette text-amber-500"></i> Personalização do PDV
+            </h2>
+            <div class="space-y-5">
+              <div>
+                <label class="text-sm text-gray-400 block mb-2">Logomarca</label>
+                <div class="flex items-center gap-4">
+                  <div id="config-logo-preview"
+                    class="w-20 h-20 rounded-xl bg-neutral-700 border border-neutral-600 flex items-center justify-center overflow-hidden shrink-0">
+                    <i class="fas fa-image text-gray-500 text-2xl"></i>
+                  </div>
+                  <div class="flex-1 space-y-2">
+                    <label class="text-xs text-gray-500 block">URL da logo</label>
+                    <input id="config-logo-url" type="text" class="input-field" placeholder="https://..."
+                      oninput="previewLogoApp()">
+                  </div>
+                </div>
+              </div>
+              <div class="border-t border-gray-700 pt-4">
+                <label class="text-sm text-gray-400 block mb-3">Cores do aplicativo</label>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-xs text-gray-500 block mb-1">Cor principal</label>
+                    <div class="flex items-center gap-2">
+                      <input id="config-cor-principal" type="color" value="#168BFF"
+                        class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent">
+                      <input id="config-cor-principal-hex" type="text" class="input-field flex-1 text-xs"
+                        value="#168BFF" oninput="syncColorPicker('principal')">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500 block mb-1">Cor dos botões</label>
+                    <div class="flex items-center gap-2">
+                      <input id="config-cor-botoes" type="color" value="#0D6EFD"
+                        class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent">
+                      <input id="config-cor-botoes-hex" type="text" class="input-field flex-1 text-xs" value="#0D6EFD"
+                        oninput="syncColorPicker('botoes')">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500 block mb-1">Cor do fundo</label>
+                    <div class="flex items-center gap-2">
+                      <input id="config-cor-fundo" type="color" value="#F5F7FA"
+                        class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent">
+                      <input id="config-cor-fundo-hex" type="text" class="input-field flex-1 text-xs" value="#F5F7FA"
+                        oninput="syncColorPicker('fundo')">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500 block mb-1">Cor do texto</label>
+                    <div class="flex items-center gap-2">
+                      <input id="config-cor-texto" type="color" value="#071426"
+                        class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent">
+                      <input id="config-cor-texto-hex" type="text" class="input-field flex-1 text-xs" value="#071426"
+                        oninput="syncColorPicker('texto')">
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3 mt-3">
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input id="config-aplicar-login" type="checkbox" class="sr-only peer">
+                    <div
+                      class="w-9 h-5 bg-neutral-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500">
+                    </div>
+                  </label>
+                  <span class="text-xs text-gray-400">Aplicar cores na tela de login</span>
+                </div>
+              </div>
+              <div class="border-t border-gray-700 pt-4">
+                <label class="text-sm text-gray-400 block mb-2">Presets</label>
+                <div class="grid grid-cols-4 gap-2">
+                  <button onclick="aplicarPreset('orion')"
+                    class="preset-btn bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-2 rounded-lg text-xs transition-colors">Orion</button>
+                  <button onclick="aplicarPreset('aura')"
+                    class="preset-btn bg-neutral-800 border border-amber-500/40 text-amber-400 font-bold py-2 rounded-lg text-xs transition-colors">Aura</button>
+                  <button onclick="aplicarPreset('verde')"
+                    class="preset-btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg text-xs transition-colors">Verde</button>
+                  <button onclick="aplicarPreset('escuro')"
+                    class="preset-btn bg-neutral-700 hover:bg-neutral-600 text-white font-bold py-2 rounded-lg text-xs transition-colors">Escuro</button>
+                </div>
+              </div>
+              <button onclick="salvarPersonalizacao()"
+                class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-3 rounded-lg transition-colors">
+                SALVAR PERSONALIZAÇÃO
+              </button>
+              <p id="config-personalizacao-status" class="text-xs text-green-400 hidden">Personalização salva!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA CONTA E ACESSO -->
+        <div id="config-aba-conta" class="grid grid-cols-1 lg:grid-cols-2 gap-6 hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <i class="fa fa-user-circle text-amber-500"></i> Meu Perfil
+            </h2>
+            <div class="space-y-4">
+              <div class="flex items-center gap-4">
+                <div id="config-avatar"
+                  class="w-16 h-16 rounded-full bg-neutral-600 flex items-center justify-center text-2xl text-gray-400 overflow-hidden shrink-0">
+                  <i class="fas fa-user"></i>
+                </div>
+                <div class="flex-1 space-y-2">
+                  <label class="text-sm text-gray-400 block">Foto do perfil</label>
+                  <input id="perfil-foto-upload" type="file" accept="image/*" onchange="uploadFotoPerfil(event)"
+                    class="text-xs text-gray-400 file:mr-2 file:px-3 file:py-1 file:rounded-lg file:bg-amber-500 file:text-neutral-900 file:font-bold file:border-0 file:cursor-pointer">
+                  <input id="config-perfil-foto-url" type="text" class="input-field"
+                    placeholder="...ou cole a URL da foto" oninput="previewFotoPerfil()">
+                </div>
+              </div>
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">Nome de exibição</label>
+                <input id="config-perfil-nome" type="text" class="input-field" placeholder="Seu nome">
+              </div>
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">E-mail (login)</label>
+                <input id="config-perfil-email" type="email" class="input-field" placeholder="seu@email.com">
+              </div>
+              <button onclick="salvarPerfil()"
+                class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-3 rounded-lg transition-colors">
+                SALVAR PERFIL
+              </button>
+              <div class="border-t border-gray-700 pt-4 space-y-3">
+                <h3 class="text-sm font-bold text-gray-300 flex items-center gap-2">
+                  <i class="fa fa-key text-amber-500"></i> Redefinir senha
+                </h3>
+                <p class="text-xs text-gray-400">A troca de senha é feita por e-mail. Você receberá um link para definir
+                  uma nova senha.</p>
+                <button onclick="enviarResetSenhaProprio()"
+                  class="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition-colors">
+                  <i class="fa fa-key"></i> Reset senha (e-mail)
+                </button>
+              </div>
+              <p id="config-perfil-status" class="text-xs text-green-400 hidden">Perfil atualizado!</p>
+            </div>
+          </div>
+          <div id="config-master-card"
+            class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg hidden">
+            <h2 class="text-xl font-bold text-white mb-1 flex items-center gap-2">
+              <i class="fa fa-user-shield text-amber-500"></i> Tornar-se Administrador
+            </h2>
+            <p class="text-xs text-gray-400 mb-4">Informe a <strong>senha master</strong> para elevar este perfil a
+              administrador. Depois de promovido, você poderá gerenciar os demais perfis.</p>
+            <div class="flex gap-2">
+              <input id="perfil-senha-master" type="password" class="input-field flex-1" placeholder="Senha master"
+                onkeydown="if(event.key==='Enter')promoverParaAdmin()">
+              <button onclick="promoverParaAdmin()"
+                class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+                TORNAR-SE ADMIN
+              </button>
+            </div>
+            <p id="config-master-status" class="text-xs text-green-400 hidden">Perfil promovido a administrador!</p>
+          </div>
+          <div id="config-funcionarios-card"
+            class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg hidden lg:col-span-2">
+            <h2 class="text-xl font-bold text-white mb-1 flex items-center gap-2">
+              <i class="fa fa-users text-amber-500"></i> Funcionários
+            </h2>
+            <p class="text-xs text-gray-400 mb-4">Somente o <strong>administrador</strong> pode visualizar e alterar as
+              contas dos funcionários. Para redefinir a senha de um funcionário, use o botão de e-mail de reset.</p>
+            <button onclick="abrirModalCadastro()"
+              class="mb-4 inline-flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-bold px-4 py-2 rounded-lg transition-colors shadow-lg shadow-green-600/20 text-sm">
+              <i class="fa fa-user-plus"></i> Novo Funcionário
+            </button>
+            <div id="lista-funcionarios" class="space-y-4"></div>
+            <p id="config-funcionarios-status" class="text-xs text-green-400 hidden">Funcionário atualizado!</p>
+          </div>
+
+          <!-- Card 4: Controle de Acesso por Módulo (admin) -->
+          <div id="config-acessos-card"
+            class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg hidden lg:col-span-2">
+            <h2 class="text-xl font-bold text-white mb-1 flex items-center gap-2">
+              <i class="fa fa-lock text-amber-500"></i> Controle de Acesso por Módulo
+            </h2>
+            <p class="text-xs text-gray-400 mb-4">Defina quais módulos/telas cada funcionário pode acessar.
+              <strong>Administradores</strong> sempre têm acesso total.</p>
+            <div class="mb-4">
+              <label class="text-sm text-gray-400 block mb-1">Selecionar funcionário</label>
+              <select id="select-acesso-funcionario" class="input-field" onchange="carregarAcessosFuncionario()">
+                <option value="">Selecione um funcionário...</option>
+              </select>
+            </div>
+            <div id="acessos-modulos-container" class="hidden">
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4" id="acessos-toggles"></div>
+              <div class="flex justify-end">
+                <button onclick="salvarAcessosModulo()"
+                  class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-6 py-2 rounded-lg transition-colors text-sm">
+                  SALVAR ACESSOS
+                </button>
+              </div>
+            </div>
+            <p id="config-acessos-status" class="text-xs text-green-400 hidden">Acessos atualizados!</p>
+          </div>
+
+        </div>
+
+        <!-- ABA LOG DE OPERAÇÕES (AUDITORIA/CONTROLADORIA) -->
+        <div id="config-aba-log" class="hidden">
+          <div class="bg-neutral-800 p-6 rounded-xl border border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-white mb-1 flex items-center gap-2">
+              <i class="fa fa-clipboard-list text-amber-500"></i> Log de Operações
+            </h2>
+            <p class="text-xs text-gray-400 mb-4">Consulta a todas as ações registradas no sistema: quem fez, o quê e
+              quando. Usado como <strong>controle interno/controladoria</strong>.</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+              <div>
+                <label class="text-xs text-gray-400 block mb-1">Tipo de ação</label>
+                <select id="log-filtro-acao" class="input-field" onchange="filtrarLogOperacoes()">
+                  <option value="">Todas</option>
+                  <option value="incluir">Inclusão</option>
+                  <option value="editar">Edição</option>
+                  <option value="excluir">Exclusão</option>
+                  <option value="bloquear">Bloqueio</option>
+                  <option value="desbloquear">Desbloqueio</option>
+                  <option value="venda">Venda</option>
+                  <option value="status">Status do pedido</option>
+                  <option value="promover">Promoção a admin</option>
+                  <option value="login">Login</option>
+                  <option value="caixa_abrir">Abertura de caixa</option>
+                  <option value="caixa_fechar">Fechamento de caixa</option>
+                  <option value="caixa_lancamento">Lançamento de caixa</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-gray-400 block mb-1">Entidade</label>
+                <select id="log-filtro-entidade" class="input-field" onchange="filtrarLogOperacoes()">
+                  <option value="">Todas</option>
+                  <option value="produto">Produto</option>
+                  <option value="cliente">Cliente</option>
+                  <option value="venda">Venda</option>
+                  <option value="config">Configurações</option>
+                  <option value="perfil">Perfil</option>
+                  <option value="usuario">Usuário/Funcionário</option>
+                  <option value="caixa">Caixa</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-gray-400 block mb-1">Usuário</label>
+                <select id="log-filtro-usuario" class="input-field" onchange="filtrarLogOperacoes()">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-gray-400 block mb-1">De</label>
+                <input id="log-filtro-de" type="date" class="input-field" onchange="filtrarLogOperacoes()">
+              </div>
+              <div>
+                <label class="text-xs text-gray-400 block mb-1">Até</label>
+                <input id="log-filtro-ate" type="date" class="input-field" onchange="filtrarLogOperacoes()">
+              </div>
+            </div>
+            <div class="flex items-center gap-3 mb-4">
+              <input id="log-busca" type="text" class="input-field flex-1"
+                placeholder="Buscar por descrição, registro ou entidade..." oninput="filtrarLogOperacoes()">
+              <button onclick="limparFiltrosLogOperacoes()"
+                class="bg-neutral-700 hover:bg-neutral-600 text-white font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+                LIMPAR FILTROS
+              </button>
+              <button onclick="recarregarLogOperacoes()"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+                <i class="fa fa-sync-alt mr-1"></i> ATUALIZAR
+              </button>
+            </div>
+
+            <p id="log-info" class="text-sm text-gray-400 mb-3"></p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4">Data/Hora</th>
+                    <th class="py-2 pr-4">Usuário</th>
+                    <th class="py-2 pr-4">Ação</th>
+                    <th class="py-2 pr-4">Entidade</th>
+                    <th class="py-2">Descrição</th>
+                  </tr>
+                </thead>
+                <tbody id="log-corpo">
+                  <tr>
+                    <td colspan="5" class="py-8 text-center text-gray-500">Carregando log de operações...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="log-pagination" class="board-pagination" style="display:none">
+              <button onclick="mudarPaginaLogOperacoes(-1)" id="log-pagina-anterior" class="board-page-btn" disabled>
+                <i class="fa fa-chevron-left"></i> Anterior
+              </button>
+              <span id="log-page-info" class="board-page-info"></span>
+              <button onclick="mudarPaginaLogOperacoes(1)" id="log-pagina-proxima" class="board-page-btn" disabled>
+                Próxima <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+    </main>
+
+  </div>
+
+  <!-- Modal de Detalhes do Pedido -->
+  <div id="modalDetalhesPedido" class="fixed inset-0 bg-black/80 z-[100] hidden items-center justify-center fade-in p-4">
+    <div
+      class="bg-neutral-800 rounded-xl border border-amber-500/30 shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+
+      <!-- Header -->
+      <div class="p-6 border-b border-gray-700 flex justify-between items-center bg-neutral-900/50 rounded-t-xl">
+        <div>
+          <h2 class="text-2xl font-bold text-amber-500">Detalhes do Pedido</h2>
+          <p id="modal-pedido-id" class="text-sm text-gray-400">#000</p>
+        </div>
+        <button onclick="fecharModalDetalhes()" class="text-gray-400 hover:text-white transition-colors">
+          <i class="fa fa-times text-2xl"></i>
+        </button>
+      </div>
+
+      <!-- Content -->
+      <div class="p-6 overflow-y-auto flex-grow space-y-6">
+
+        <!-- Status e Data -->
+        <div class="flex justify-between items-start bg-neutral-700/30 p-4 rounded-lg">
+          <div>
+            <p class="text-sm text-gray-400">Status Atual</p>
+            <span id="modal-pedido-status" class="font-bold text-lg text-white">---</span>
+          </div>
+          <div class="text-right">
+            <p class="text-sm text-gray-400">Data do Pedido</p>
+            <span id="modal-pedido-data" class="font-bold text-white">---</span>
+          </div>
+        </div>
+
+        <!-- Cliente -->
+        <div class="bg-neutral-700/30 p-4 rounded-lg">
+          <h3 class="text-amber-500 font-bold mb-2 border-b border-gray-600 pb-1"><i class="fa fa-user"></i> Dados do
+            Cliente</h3>
+          <p class="text-white"><span class="text-gray-400">Nome:</span> <span id="modal-cliente-nome"
+              class="font-medium">---</span></p>
+          <p class="text-white"><span class="text-gray-400">Endereço:</span> <span
+              id="modal-cliente-endereco">---</span></p>
+        </div>
+
+        <!-- Itens -->
+        <div>
+          <h3 class="text-amber-500 font-bold mb-3 border-b border-gray-600 pb-1"><i class="fa fa-list"></i> Itens do
+            Pedido</h3>
+          <div class="bg-neutral-900/50 rounded-lg overflow-hidden border border-gray-700">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-neutral-700 text-gray-300">
+                <tr>
+                  <th class="p-3">Qtd</th>
+                  <th class="p-3">Produto</th>
+                  <th class="p-3 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody id="modal-itens-lista" class="divide-y divide-gray-700 text-gray-200">
+                <!-- Itens via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Total FInal -->
+        <div class="flex justify-end pt-4 border-t border-gray-700">
+          <div class="text-right">
+            <p class="text-gray-400 text-sm">Total do Pedido</p>
+            <p id="modal-pedido-total" class="text-3xl font-bold text-green-400">R$ 0,00</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="p-4 border-t border-gray-700 bg-neutral-900/50 rounded-b-xl">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <button onclick="fecharModalDetalhes()"
+            class="px-5 py-2.5 rounded-lg text-gray-300 hover:bg-neutral-700 transition-colors font-medium text-sm shrink-0">
+            Fechar
+          </button>
+          <div class="flex flex-wrap items-center gap-2 min-w-0">
+            <button id="btn-imprimir-comanda" onclick="imprimirComandaAtual()"
+              class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-2.5 px-4 rounded-lg shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-transform active:scale-95 text-sm shrink-0">
+              <i class="fa fa-print"></i> IMPRIMIR COMANDA (COZINHA)
+            </button>
+            <button id="btn-imprimir-comprovante" onclick="imprimirComprovanteAtual()"
+              class="bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-transform active:scale-95 text-sm shrink-0">
+              <i class="fa fa-receipt"></i> IMPRIMIR COMPROVANTE (PEDIDO)
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL NOVA ENTRADA -->
+  <div id="modalEntrada" class="fixed inset-0 bg-black/80 z-[100] hidden items-center justify-center fade-in p-4"
+    onclick="if(event.target===this) fecharModalEntrada()">
+    <div
+      class="bg-neutral-800 rounded-xl border border-amber-500/20 w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="p-5 border-b border-gray-700 flex justify-between items-center">
+        <h2 id="entrada-modal-titulo" class="text-2xl font-bold text-white">Nova Entrada</h2>
+        <button onclick="fecharModalEntrada()" class="text-gray-400 hover:text-white text-2xl"><i
+            class="fa fa-times"></i></button>
+      </div>
+      <div class="p-5 space-y-5 overflow-y-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label for="entrada-fornecedor" class="text-sm text-gray-400 block mb-1">Fornecedor *</label>
+            <select id="entrada-fornecedor" class="input-field"></select>
+          </div>
+          <div>
+            <label for="entrada-nota" class="text-sm text-gray-400 block mb-1">Nº da Nota</label>
+            <input id="entrada-nota" type="text" placeholder="Ex.: 12345" class="input-field">
+          </div>
+          <div>
+            <label for="entrada-serie" class="text-sm text-gray-400 block mb-1">Série</label>
+            <input id="entrada-serie" type="text" placeholder="Ex.: 1" class="input-field">
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label for="entrada-chave" class="text-sm text-gray-400">Chave NF-e (44 dígitos)</label>
+              <span id="entrada-chave-contador" class="text-xs text-gray-500 font-mono">0/44</span>
+            </div>
+            <input id="entrada-chave" type="text" inputmode="numeric" maxlength="44"
+              placeholder="00000000000000000000000000000000000000000000" class="input-field font-mono text-sm tracking-wider"
+              oninput="validarChaveNFEInput(this)">
+          </div>
+          <div>
+            <label for="entrada-data-emissao" class="text-sm text-gray-400 block mb-1">Data Emissão</label>
+            <input id="entrada-data-emissao" type="date" class="input-field">
+          </div>
+          <div>
+            <label for="entrada-data-entrada" class="text-sm text-gray-400 block mb-1">Data Entrada</label>
+            <input id="entrada-data-entrada" type="date" class="input-field">
+          </div>
+          <div class="lg:col-span-3">
+            <label for="entrada-observacao" class="text-sm text-gray-400 block mb-1">Observações</label>
+            <textarea id="entrada-observacao" rows="2" class="input-field"
+              placeholder="Anotações opcionais sobre a entrada"></textarea>
+          </div>
+        </div>
+
+        <div class="bg-neutral-900/50 rounded-lg p-4 border border-gray-700">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-white">Itens da Entrada</h3>
+            <button onclick="abrirModalProdutoRapido()" id="entrada-cadastro-rapido-link"
+              class="text-xs text-amber-400 hover:text-amber-300 underline">
+              <i class="fa fa-plus mr-1"></i>Produto não cadastrado? Cadastrar rápido
+            </button>
+          </div>
+          <div class="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="entrada-busca-produto-nome" class="text-sm text-gray-400 block mb-1">Buscar por nome</label>
+              <input id="entrada-busca-produto-nome" type="text" placeholder="Digite o nome do produto..."
+                class="input-field" oninput="filtrarSelectProdutosEntrada()">
+            </div>
+            <div>
+              <label for="entrada-busca-produto-codigo" class="text-sm text-gray-400 block mb-1">Buscar por ID</label>
+              <input id="entrada-busca-produto-codigo" type="number" min="1" placeholder="Ex.: 001" class="input-field"
+                oninput="filtrarSelectProdutosEntrada()">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end" id="entrada-adicionar-item">
+            <div class="md:col-span-2 relative">
+              <label class="text-sm text-gray-400 block mb-1">Produto</label>
+              <input type="hidden" id="entrada-item-produto">
+              <button type="button" id="entradaProdutoBtn" onclick="toggleSelectProdutosEntrada(event)"
+                class="input-field appearance-none w-full text-left flex items-center justify-between gap-2">
+                <span id="entradaProdutoLabel" class="truncate">Selecione o produto...</span>
+                <i class="fa fa-chevron-down text-gray-500"></i>
+              </button>
+              <div id="entradaProdutoDropdown"
+                class="status-dropdown absolute left-0 right-0 mt-2 w-full bg-neutral-800 rounded-xl shadow-2xl z-20 hidden border border-gray-600 overflow-hidden">
+                <div id="listaSelectProdutosEntrada" class="max-h-64 overflow-y-auto"></div>
+                <div id="select-produto-entrada-pagination" class="board-pagination px-3 py-2" style="display:none">
+                  <button onclick="mudarPaginaSelectProdutosEntrada(-1)" id="select-produto-entrada-pagina-anterior"
+                    class="board-page-btn" disabled>
+                    <i class="fa fa-chevron-left"></i> Anterior
+                  </button>
+                  <span id="select-produto-entrada-page-info" class="board-page-info"></span>
+                  <button onclick="mudarPaginaSelectProdutosEntrada(1)" id="select-produto-entrada-pagina-proxima"
+                    class="board-page-btn" disabled>
+                    Próxima <i class="fa fa-chevron-right"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label class="text-sm text-gray-400 block mb-1">Quantidade</label>
+              <input id="entrada-item-qtd" type="number" min="0.001" step="0.001" value="1" class="input-field">
+            </div>
+            <div>
+              <label class="text-sm text-gray-400 block mb-1">Custo unit. (R$)</label>
+              <input id="entrada-item-custo" type="number" min="0" step="0.01" class="input-field">
+            </div>
+            <div class="md:col-span-4">
+              <button onclick="adicionarItemEntrada()"
+                class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-2 rounded-lg transition-colors">
+                <i class="fa fa-plus mr-1"></i> ADICIONAR ITEM
+              </button>
+            </div>
+          </div>
+          <div class="overflow-x-auto mt-3">
+            <table class="w-full text-left">
+              <thead class="bg-neutral-700 text-gray-300">
+                <tr>
+                  <th class="p-2">Produto</th>
+                  <th class="p-2 w-20 text-center">Qtd</th>
+                  <th class="p-2 w-32">Custo Unit.</th>
+                  <th class="p-2 w-32">Custo Total</th>
+                  <th class="p-2 w-12 text-center"></th>
+                </tr>
+              </thead>
+              <tbody id="entrada-itens-lista">
+                <tr>
+                  <td colspan="5" class="p-3 text-center text-gray-500 italic">Nenhum item adicionado.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-3 flex justify-end">
+            <p class="text-white text-lg">Total: <span id="entrada-total" class="font-bold text-amber-400">R$
+                0,00</span></p>
+          </div>
+        </div>
+      </div>
+      <div class="p-5 border-t border-gray-700 flex flex-wrap gap-3 justify-end">
+        <button onclick="fecharModalEntrada()"
+          class="px-6 py-2 rounded-lg text-gray-300 hover:bg-neutral-700 transition-colors font-medium">
+          Cancelar
+        </button>
+        <button onclick="salvarEntrada('RASCUNHO')" id="entrada-btn-salvar-rascunho"
+          class="px-6 py-2 rounded-lg text-gray-300 hover:bg-neutral-700 transition-colors font-medium border border-gray-600">
+          Salvar Rascunho
+        </button>
+        <button onclick="confirmarEntrada()" id="entrada-btn-confirmar"
+          class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-6 py-2 rounded-lg shadow-lg shadow-amber-500/20">
+          <i class="fa fa-check mr-1"></i> CONFIRMAR ENTRADA
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CONTA A PAGAR -->
+  <div id="modalContaPagar" class="fixed inset-0 bg-black/80 z-[100] hidden items-center justify-center fade-in p-4"
+    onclick="if(event.target===this) fecharModalContaPagar()">
+    <div
+      class="bg-neutral-800 rounded-xl border border-amber-500/20 w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="p-5 border-b border-gray-700 flex justify-between items-center">
+        <h2 id="conta-pagar-modal-titulo" class="text-2xl font-bold text-white">Nova Conta a Pagar</h2>
+        <button onclick="fecharModalContaPagar()" class="text-gray-400 hover:text-white text-2xl"><i
+            class="fa fa-times"></i></button>
+      </div>
+      <div class="p-5 space-y-4 overflow-y-auto">
+        <div id="conta-pagar-origem-info"
+          class="bg-neutral-900/50 border border-gray-700 rounded-lg p-3 text-sm text-gray-300 hidden"></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md:col-span-2">
+            <label for="conta-pagar-fornecedor" class="text-sm text-gray-400 block mb-1">Fornecedor *</label>
+            <select id="conta-pagar-fornecedor" class="input-field"></select>
+          </div>
+          <div class="md:col-span-2">
+            <label for="conta-pagar-descricao" class="text-sm text-gray-400 block mb-1">Descrição *</label>
+            <input id="conta-pagar-descricao" type="text" placeholder="Ex.: Nota fiscal 12345" class="input-field">
+          </div>
+          <div>
+            <label for="conta-pagar-valor" class="text-sm text-gray-400 block mb-1">Valor (R$) *</label>
+            <input id="conta-pagar-valor" type="number" min="0.01" step="0.01" class="input-field">
+          </div>
+          <div>
+            <label for="conta-pagar-vencimento" class="text-sm text-gray-400 block mb-1">Data de Vencimento *</label>
+            <input id="conta-pagar-vencimento" type="date" class="input-field">
+          </div>
+          <div class="md:col-span-2">
+            <label for="conta-pagar-forma" class="text-sm text-gray-400 block mb-1">Forma de Pagamento</label>
+            <select id="conta-pagar-forma" class="input-field">
+              <option value="">Selecione a forma de pagamento...</option>
+              <option value="DINHEIRO">Dinheiro</option>
+              <option value="PIX">PIX</option>
+              <option value="CARTAO">Cartão</option>
+              <option value="OUTROS">Outros</option>
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <label for="conta-pagar-observacao" class="text-sm text-gray-400 block mb-1">Observações</label>
+            <textarea id="conta-pagar-observacao" rows="2" class="input-field"
+              placeholder="Anotações opcionais"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="p-5 border-t border-gray-700 flex flex-wrap gap-3 justify-end">
+        <button onclick="fecharModalContaPagar()"
+          class="px-6 py-2 rounded-lg text-gray-300 hover:bg-neutral-700 transition-colors font-medium">
+          Cancelar
+        </button>
+        <button onclick="salvarContaPagar()" id="conta-pagar-btn-salvar"
+          class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-6 py-2 rounded-lg shadow-lg shadow-amber-500/20">
+          <i class="fa fa-check mr-1"></i> SALVAR CONTA
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL BAIXA DE CONTA A PAGAR -->
+  <div id="modalBaixaConta" class="fixed inset-0 bg-black/80 z-[105] hidden items-center justify-center fade-in p-4"
+    onclick="if(event.target===this) fecharModalBaixaConta()">
+    <div
+      class="bg-neutral-800 rounded-xl border border-amber-500/20 w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="p-5 border-b border-gray-700 flex justify-between items-center">
+        <h2 class="text-xl font-bold text-white">Dar Baixa em Conta</h2>
+        <button onclick="fecharModalBaixaConta()" class="text-gray-400 hover:text-white text-2xl"><i
+            class="fa fa-times"></i></button>
+      </div>
+      <div class="p-5 space-y-4 overflow-y-auto">
+        <div id="baixa-conta-info"
+          class="bg-neutral-900/50 border border-gray-700 rounded-lg p-3 text-sm text-gray-300"></div>
+        <div>
+          <label for="baixa-conta-valor" class="text-sm text-gray-400 block mb-1">Valor da baixa (R$) *</label>
+          <input id="baixa-conta-valor" type="number" min="0.01" step="0.01" class="input-field">
+        </div>
+        <div>
+          <label for="baixa-conta-forma" class="text-sm text-gray-400 block mb-1">Forma de pagamento *</label>
+          <select id="baixa-conta-forma"
+            class="input-field appearance-none bg-neutral-900 border border-neutral-600 focus:border-amber-500">
+            <option value="DINHEIRO">Dinheiro</option>
+            <option value="PIX">PIX</option>
+            <option value="CARTAO">Cartão</option>
+            <option value="OUTROS">Outros</option>
+          </select>
+        </div>
+        <div>
+          <label for="baixa-conta-data" class="text-sm text-gray-400 block mb-1">Data do pagamento</label>
+          <input id="baixa-conta-data" type="date" class="input-field">
+        </div>
+        <div>
+          <label for="baixa-conta-observacao" class="text-sm text-gray-400 block mb-1">Observação (opcional)</label>
+          <input id="baixa-conta-observacao" type="text" class="input-field" placeholder="Ex.: boleto pago em dinheiro">
+        </div>
+      </div>
+      <div class="p-5 border-t border-gray-700 flex flex-wrap gap-3 justify-end">
+        <button onclick="fecharModalBaixaConta()"
+          class="px-6 py-2 rounded-lg text-gray-300 hover:bg-neutral-700 transition-colors font-medium">
+          Cancelar
+        </button>
+        <button onclick="confirmarBaixaConta()"
+          class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-6 py-2 rounded-lg shadow-lg shadow-amber-500/20">
+          <i class="fa fa-check mr-1"></i> CONFIRMAR BAIXA
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL VER BAIXAS DA CONTA -->
+  <div id="modalVerBaixas" class="fixed inset-0 bg-black/80 z-[105] hidden items-center justify-center fade-in p-4"
+    onclick="if(event.target===this) fecharModalVerBaixas()">
+    <div
+      class="bg-neutral-800 rounded-xl border border-amber-500/20 w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="p-5 border-b border-gray-700 flex justify-between items-center">
+        <h2 id="ver-baixas-titulo" class="text-xl font-bold text-white">Baixas da Conta</h2>
+        <button onclick="fecharModalVerBaixas()" class="text-gray-400 hover:text-white text-2xl"><i
+            class="fa fa-times"></i></button>
+      </div>
+      <div class="p-5 space-y-4 overflow-y-auto">
+        <div id="ver-baixas-info" class="bg-neutral-900/50 border border-gray-700 rounded-lg p-3 text-sm text-gray-300">
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead class="bg-neutral-700 text-gray-300">
+              <tr>
+                <th class="p-3">Data</th>
+                <th class="p-3">Forma</th>
+                <th class="p-3">Valor</th>
+                <th class="p-3">Por</th>
+              </tr>
+            </thead>
+            <tbody id="ver-baixas-tbody">
+              <tr>
+                <td colspan="4" class="p-4 text-center text-gray-500 italic">Carregando...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="p-5 border-t border-gray-700 flex justify-end">
+        <button onclick="fecharModalVerBaixas()"
+          class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-6 py-2 rounded-lg shadow-lg shadow-amber-500/20">
+          <i class="fa fa-check mr-1"></i> FECHAR
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CADASTRO DE PRODUTO (formulário completo, mesmo padrão do Cardápio) -->
+  <div id="modalProdutoRapido" class="fixed inset-0 bg-black/80 z-[110] hidden items-center justify-center fade-in p-4"
+    onclick="if(event.target===this) fecharModalProdutoRapido()">
+    <div
+      class="bg-neutral-800 rounded-xl border border-amber-500/20 w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="p-5 border-b border-gray-700 flex justify-between items-center">
+        <h2 class="text-xl font-bold text-white">Cadastrar Novo Produto</h2>
+        <button onclick="fecharModalProdutoRapido()" class="text-gray-400 hover:text-white text-2xl"><i
+            class="fa fa-times"></i></button>
+      </div>
+      <div class="p-5 space-y-4 overflow-y-auto">
+        <div>
+          <label for="rapido-nome" class="text-sm text-gray-400 block mb-1">Nome do Produto *</label>
+          <input id="rapido-nome" type="text" placeholder="Ex: Pod Mango Ice, Refil Mint" class="input-field">
+        </div>
+        <div>
+          <label for="rapido-imagem" class="text-sm text-gray-400 block mb-1">URL da Imagem</label>
+          <input id="rapido-imagem" type="text" placeholder="https://..." class="input-field">
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label for="rapido-marca" class="text-sm text-gray-400 block mb-1">Marca</label>
+            <select id="rapido-marca" class="input-field">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          <div>
+            <label for="rapido-grupo" class="text-sm text-gray-400 block mb-1">Grupo</label>
+            <select id="rapido-grupo" class="input-field">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          <div>
+            <label for="rapido-subgrupo" class="text-sm text-gray-400 block mb-1">Subgrupo</label>
+            <select id="rapido-subgrupo" class="input-field">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="rapido-codigo-barras" class="text-sm text-gray-400 block mb-1">Código de Barras (EAN-13)</label>
+          <input id="rapido-codigo-barras" type="text" inputmode="numeric" maxlength="13"
+            placeholder="13 dígitos — Ex: 7891234567890" class="input-field" oninput="tratarInputCodigoBarras(this)">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="rapido-preco" class="text-sm text-gray-400 block mb-1">Preço (R$) *</label>
+            <input id="rapido-preco" type="number" step="0.01" placeholder="Ex: 45.00" class="input-field">
+          </div>
+          <div>
+            <label for="rapido-qtd" class="text-sm text-gray-400 block mb-1">Quantidade em Estoque</label>
+            <input id="rapido-qtd" type="number" value="0" placeholder="Ex: 50" class="input-field">
+          </div>
+        </div>
+      </div>
+      <div class="p-5 border-t border-gray-700 flex flex-wrap gap-3 justify-end">
+        <button onclick="fecharModalProdutoRapido()"
+          class="px-6 py-2 rounded-lg text-gray-300 hover:bg-neutral-700 transition-colors font-medium">
+          Cancelar
+        </button>
+        <button onclick="salvarProdutoRapido()"
+          class="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold px-6 py-2 rounded-lg shadow-lg shadow-amber-500/20">
+          <i class="fa fa-plus mr-1"></i> CADASTRAR PRODUTO
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js?v=13"></script>
+
+</body>
+
+</html>

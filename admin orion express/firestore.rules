@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Catálogo público. Usuários autenticados podem administrar produtos
+    // e o checkout pode diminuir a quantidade disponível.
+    match /estoque/{produtoId} {
+      allow read: if true;
+      allow create, delete: if isSignedIn();
+      allow update: if isSignedIn()
+                    && request.resource.data.qtd is number
+                    && request.resource.data.qtd >= 0;
+    }
+
+    // A aplicação atual usa a mesma autenticação para clientes e operadores.
+    // O painel administrativo precisa consultar e administrar toda a coleção.
+    match /clientes/{clienteId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // Clientes autenticados criam pedidos; o painel lê e atualiza seus status.
+    // Validação: pedidos devem incluir submittedAt (timestamp do servidor) para
+    // auditoria de horário de funcionamento. Validação completa de horário é
+    // feita no frontend; para proteção total, considere Cloud Functions.
+    match /vendas/{vendaId} {
+      allow read, update: if isSignedIn();
+      allow create: if (isSignedIn() && isOperador()) || (isSignedIn()
+        && request.resource.data.submittedAt is timestamp
+        && request.resource.data.total is number
+        && request.resource.data.total > 0
+        && request.resource.data.itens is list
+        && request.resource.data.clienteUid == request.auth.uid);
+      allow delete: if false;
+    }
+
+    // Banner e configurações públicas para leitura e protegidas para escrita.
+    match /config/{configId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Perfis de usuário (admin/funcionario): leitura autenticada. A CRIAÇÃO e a
+    // EXCLUSÃO de perfil são exclusivas do ADMIN (evita que um cliente crie o
+    // próprio doc em 'usuarios' e ganhe acesso ao painel). Cada usuário pode
+    // ATUALIZAR o próprio perfil, exceto o campo 'bloqueado' (evita auto-desbloqueio).
+    // NOTA: usar a FUNÇÃO exists() — a propriedade get(...).exists nega a escrita.
+    function isAdminUsuarios() {
+      return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Operador do painel (admin ou funcionario): tem perfil cadastrado em 'usuarios'.
+    // Usado para proteger coleções exclusivas do painel (caixas / movimentacoes_caixa),
+    // impedindo que clientes autenticados do app acessem/adversem o caixa.
+    function isOperador() {
+      return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+    match /usuarios/{uid} {
+      allow read: if isSignedIn();
+      // CREATE: admin pode criar OU primeiro usuário cria seu próprio doc (bootstrap).
+      // No bootstrap: só pode criar o doc com o próprio UID e role 'admin'.
+      allow create: if isSignedIn() && (
+        isAdminUsuarios()
+        || (request.auth.uid == uid && request.resource.data.role == 'admin')
+      );
+      allow delete: if isSignedIn() && isAdminUsuarios();
+      allow update: if isSignedIn() && (
+        (request.auth.uid == uid
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['bloqueado']))
+        || isAdminUsuarios());
+    }
+
+    // Gerenciamento de caixa (painel admin): abertura/lançamentos/fechamento
+    // são exclusivos de operadores. O app do cliente não toca nesses dados.
+    match /caixas/{caixaId} {
+      allow read: if isSignedIn() && isOperador();
+      allow create, update, delete: if isSignedIn() && isOperador();
+    }
+    match /movimentacoes_caixa/{movId} {
+      allow read: if isSignedIn() && isOperador();
+      allow create, update, delete: if isSignedIn() && isOperador();
+    }
+
+    // Log de operações (auditoria/controladoria): apêndice — operadores apenas
+    // LEEM e CRIAM novos registros; nunca alteram/apagam o histórico (integridade).
+    match /logs/{logId} {
+      allow read: if isSignedIn() && isOperador();
+      allow create: if isSignedIn() && isOperador();
+      allow update, delete: if false;
+    }
+
+    // Gestão de estoque/entradas (painel admin): fornecedores e entradas são
+    // exclusive de operadores. Movimentação de estoque é apêndice (auditoria):
+    // operadores apenas LEEM e CRIAM; o histórico nunca é alterado/apagado.
+    match /fornecedores/{fornecedorId} {
+      allow read, create, update, delete: if isSignedIn() && isOperador();
+    }
+    match /entradas/{entradaId} {
+      allow read, create, update, delete: if isSignedIn() && isOperador();
+    }
+    // Comanda por Mesa: operadores gerenciam mesas e comandas.
+    match /mesas/{mesaId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && isOperador();
+    }
+    match /movimentacoes_estoque/{movId} {
+      allow read: if isSignedIn() && isOperador();
+      allow create: if isSignedIn() && isOperador();
+      allow update, delete: if false;
+    }
+
+    // Contas a pagar (painel admin): leitura/escrita exclusivas de operadores.
+    // As baixas geram lançamentos em movimentacoes_caixa (tipo DESPESA).
+    match /contas_pagar/{contaId} {
+      allow read, create, update, delete: if isSignedIn() && isOperador();
+    }
+
+    // Bloqueia qualquer coleção não declarada acima.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -5,3 +5,6 @@ dist/
 .env.local
 build/
 .codex/
+serviceaccountkey.json
+serviceAccountKey.json
+

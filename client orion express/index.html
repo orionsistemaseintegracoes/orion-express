@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Orion Express - Pedidos Online</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDKs (Compat) -->
+    <!-- Supabase e Compatibilidade Firebase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <script src="supabase-compat.js"></script>
+
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="icon" type="image/png" href="./orion-logo.png">
+    
+</head>
+
+<body class="h-screen overflow-hidden flex flex-col">
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <!-- ================= TELA DE AUTENTICAÇÃO ================= -->
+    <section id="auth-screen"
+        class="fixed inset-0 z-[70] w-full h-full flex flex-col items-center justify-center bg-black hidden">
+        <div class="absolute inset-0 bg-neutral-900 overflow-hidden -z-10">
+            <i class="fa fa-wind text-neutral-800 text-9xl absolute -top-10 -left-10 rotate-45 opacity-20"></i>
+            <i class="fa fa-wind text-neutral-800 text-9xl absolute bottom-10 right-10 -rotate-12 opacity-20"></i>
+        </div>
+
+        <div
+            class="bg-neutral-800 p-8 rounded-xl border border-amber-500/30 shadow-2xl w-full max-w-md mx-auto text-center max-h-screen overflow-y-auto relative z-10">
+            <button onclick="closeAuth()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl p-2 transition-colors" title="Fechar">
+                <i class="fa fa-times"></i>
+            </button>
+            <!-- Logo -->
+            <div class="mb-6">
+                <img src="orion-logo.png" alt="Orion Express"
+                    class="w-32 h-32 mx-auto mb-4 drop-shadow-2xl"
+                    onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
+                <div id="logo-fallback" style="display:none;">
+                    <h1 id="logo-fallback-title" class="text-4xl font-bold text-amber-500 neon-text">🚀 Orion Express</h1>
+                </div>
+                <h2 class="text-2xl font-bold text-white mt-2">Portal do Cliente</h2>
+            </div>
+            <p class="text-gray-400 mb-6">Cadastre-se ou entre para fazer seu pedido.</p>
+
+            <form onsubmit="event.preventDefault(); handleLoginReal();">
+                <div class="space-y-4 mb-4 text-left">
+                    <input id="login-email" type="email" placeholder="Seu E-mail" required
+                        class="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition-colors">
+                    <input id="login-pass" type="password" placeholder="Sua Senha" required
+                        class="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition-colors">
+                </div>
+
+                <div id="login-aviso" class="hidden mb-4 p-3 rounded-lg bg-red-950/60 border border-red-500/40 text-red-400 text-sm flex items-center gap-2 text-left">
+                    <i class="fa fa-circle-exclamation flex-shrink-0"></i>
+                    <span id="login-aviso-texto"></span>
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-amber-500 hover:bg-amber-400 text-neutral-900 font-bold py-3 rounded-lg transition-colors shadow-lg shadow-amber-500/20 mb-4">
+                    ENTRAR
+                </button>
+            </form>
+
+            <p class="text-xs text-gray-500 mt-4">
+                Não tem cadastro?
+                <button
+                    onclick="document.getElementById('cadastroModal').classList.remove('hidden'); document.getElementById('cadastroModal').classList.add('flex');"
+                    class="text-amber-500 hover:text-amber-400 font-semibold transition-colors">
+                    Cadastre-se aqui
+                </button>
+            </p>
+        </div>
+    </section>
+
+    <!-- Modal de Cadastro -->
+    <div id="cadastroModal" class="fixed inset-0 bg-black/80 z-[60] hidden items-center justify-center p-4 fade-in">
+        <div class="bg-neutral-800 p-8 rounded-xl border border-amber-500/30 shadow-2xl w-full max-w-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-amber-500">Novo Cliente</h2>
+                <button
+                    onclick="document.getElementById('cadastroModal').classList.add('hidden'); document.getElementById('cadastroModal').classList.remove('flex');"
+                    class="text-gray-400 hover:text-white">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <form onsubmit="event.preventDefault(); handleRegisterReal();">
+                <div class="space-y-4 mb-4">
+                    <input id="cad-email" type="email" placeholder="E-mail (acesso)" required
+                        class="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-amber-500 focus:outline-none">
+                    <input id="cad-pass" type="password" placeholder="Senha (mínimo 6 caracteres)" required
+                        minlength="6"
+                        class="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-amber-500 focus:outline-none">
+                    <input id="cad-pass-conf" type="password" placeholder="Confirmar Senha" required minlength="6"
+                        class="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-amber-500 focus:outline-none">
+                </div>
+
+                <div id="cad-aviso" class="hidden mb-4 p-3 rounded-lg bg-red-950/60 border border-red-500/40 text-red-400 text-sm flex items-center gap-2 text-left">
+                    <i class="fa fa-circle-exclamation flex-shrink-0"></i>
+                    <span id="cad-aviso-texto"></span>
+                </div>
+
+                <button type="submit"
+                    class="w-full mt-2 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg shadow-green-600/20">
+                    CADASTRAR E ENTRAR
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- ================= TELA DE COMPLETAR CADASTRO (Obrigatório) ================= -->
+    <section id="setup-screen" class="fixed inset-0 z-[70] flex flex-col hidden"
+        style="background-color: var(--bg-primary)">
+        <div class="p-6 themed-bg border-b border-amber-500/20 shadow-lg">
+            <h2 class="text-xl font-bold text-amber-500">📝 Complete seu Cadastro</h2>
+            <p class="text-sm themed-text-secondary">Precisamos dessas informações para entregar seu pedido.</p>
+        </div>
+        <div class="flex-grow overflow-y-auto p-6">
+            <form id="form-setup" class="space-y-4 max-w-md mx-auto" onsubmit="event.preventDefault(); saveProfile();">
+                <div>
+                    <label class="text-amber-500 font-bold text-sm">Nome Completo *</label>
+                    <input id="setup-nome" type="text" class="input-field w-full p-3 rounded-lg" required>
+                </div>
+                <div>
+                    <label class="text-amber-500 font-bold text-sm">Telefone / WhatsApp *</label>
+                    <input id="setup-tel" type="tel" class="input-field w-full p-3 rounded-lg"
+                        placeholder="(00) 00000-0000" required>
+                </div>
+                <div>
+                    <label class="text-amber-500 font-bold text-sm">Endereço (Rua/Av) *</label>
+                    <input id="setup-endereco" type="text" class="input-field w-full p-3 rounded-lg" required>
+                </div>
+                <div class="flex gap-4">
+                    <div class="w-1/3">
+                        <label class="text-amber-500 font-bold text-sm">Número *</label>
+                        <input id="setup-numero" type="text" class="input-field w-full p-3 rounded-lg" required>
+                    </div>
+                    <div class="w-2/3">
+                        <label class="text-amber-500 font-bold text-sm">CEP *</label>
+                        <input id="setup-cep" type="text" class="input-field w-full p-3 rounded-lg" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-amber-500 font-bold text-sm">Forma de Pagamento Preferida *</label>
+                    <select id="setup-pagamento" class="input-field w-full p-3 rounded-lg" required>
+                        <option value="">-- Selecione --</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="Cartao">Cartão de Crédito/Débito</option>
+                        <option value="PIX">PIX</option>
+                    </select>
+                </div>
+
+                <div id="setup-aviso" class="hidden p-3 rounded-lg bg-red-950/60 border border-red-500/40 text-red-400 text-sm flex items-center gap-2 text-left">
+                    <i class="fa fa-circle-exclamation flex-shrink-0"></i>
+                    <span id="setup-aviso-texto"></span>
+                </div>
+
+                <button id="btn-salvar-setup" type="submit" class="btn-primary w-full py-4 rounded-lg font-bold text-lg mt-6 flex items-center justify-center gap-2">
+                    <span>SALVAR E CONTINUAR</span> <i class="fa fa-arrow-right"></i>
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- ================= APP PRINCIPAL ================= -->
+    <div id="app-screen" class="flex flex-col h-full">
+
+        <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+        <!-- Header -->
+        <header
+            class="themed-header backdrop-blur-md border-b border-amber-500/20 p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebar()" class="header-icon p-2 -ml-2 rounded-lg text-gray-300 hover:text-amber-500 transition-colors" title="Mostrar/ocultar menu">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <div class="w-10 h-10 rounded-full overflow-hidden bg-amber-500 flex items-center justify-center">
+                    <img src="orion-logo.png" alt="Orion Express"
+                        class="w-full h-full object-contain p-1">
+                </div>
+                <div>
+                    <h1 id="header-user-name" class="font-bold themed-text leading-tight">Olá, Cliente</h1>
+                    <p class="text-xs text-amber-500">Seu pedido em tempo real</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Theme Toggle -->
+                <div class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+                    <div class="theme-toggle-slider">
+                        <i class="theme-icon fa fa-moon" id="theme-icon"></i>
+                    </div>
+                </div>
+                <button onclick="handleUserAction()" id="user-action-btn" class="themed-text-secondary hover:text-amber-500 transition-colors"
+                    title="Entrar">
+                    <i class="fa fa-sign-in-alt text-xl" id="user-action-icon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-grow overflow-y-auto relative">
+
+            <!-- View: Menu -->
+            <div id="view-menu" class="client-view p-4 pb-24 fade-in">
+                <!-- Banner Promo -->
+                <div
+                    class="promo-banner rounded-2xl p-6 mb-4 text-white shadow-lg relative overflow-hidden">
+                    <div class="relative z-10">
+                        <h2 class="text-2xl font-bold mb-1">Promoção do Dia!</h2>
+                        <p class="text-white/90 text-sm mb-3">Veja mais detalhes!!</p>
+                        <button onclick="document.getElementById('products-grid').scrollIntoView({behavior: 'smooth'})"
+                            class="promo-button bg-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg hover:bg-gray-100 transition-colors">
+                            Ver Ofertas
+                        </button>
+                    </div>
+                    <i class="fa fa-wind absolute -right-4 -bottom-4 text-9xl text-white/20 rotate-12"></i>
+                </div>
+
+                <!-- Banner Personalizado -->
+                <div id="custom-banner" class="hidden mb-4 rounded-2xl overflow-hidden shadow-lg"></div>
+
+                <!-- Status da Loja -->
+                <div id="store-status-banner" class="hidden mb-4 rounded-xl p-4 flex items-center gap-3 transition-all">
+                    <span id="store-status-dot" class="w-3 h-3 rounded-full flex-shrink-0"></span>
+                    <div>
+                        <p id="store-status-texto" class="font-bold text-sm"></p>
+                        <p id="store-status-horario" class="text-xs opacity-80"></p>
+                    </div>
+                </div>
+
+                <h3 class="text-xl font-bold themed-text mb-4 flex items-center gap-2">
+                    <i class="fa fa-utensils text-amber-500"></i> Catálogo
+                </h3>
+
+                <div id="guest-note"
+                    class="hidden mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm themed-text flex items-start gap-3">
+                    <i class="fa fa-info-circle mt-0.5 text-amber-500 text-base"></i>
+                    <span>Você está navegando como visitante. Você pode montar seu carrinho normalmente! O login será solicitado apenas na finalização do pedido.</span>
+                </div>
+
+                <!-- Grid de Produtos -->
+                <div id="products-grid" class="grid grid-cols-2 gap-4">
+                    <!-- Injetado via JS -->
+                    <div class="col-span-2 text-center py-10">
+                        <i class="fa fa-spinner fa-spin text-amber-500 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Meus Pedidos -->
+            <div id="view-orders" class="client-view p-4 pb-24 hidden fade-in">
+                <h3 class="text-xl font-bold themed-text mb-4 flex items-center gap-2">
+                    <i class="fa fa-list-alt text-amber-500"></i> Meus Pedidos
+                </h3>
+                <div id="orders-list" class="space-y-4">
+                    <!-- Injetado via JS -->
+                </div>
+            </div>
+
+            <!-- View: Meus Dados / Perfil -->
+            <div id="view-profile" class="client-view p-4 pb-24 hidden fade-in">
+                <div class="max-w-2xl mx-auto">
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold themed-text flex items-center gap-2">
+                            <i class="fa fa-id-card text-amber-500"></i> Meus Dados Cadastrais
+                        </h3>
+                        <p class="text-xs themed-text-secondary mt-1">Atualize suas informações para entrega e pedidos rápidos.</p>
+                    </div>
+
+                    <div class="themed-card rounded-2xl p-6 border shadow-xl">
+                        <form id="form-perfil" class="space-y-4" onsubmit="event.preventDefault(); salvarDadosPerfil();">
+                            <div>
+                                <label class="text-amber-500 font-bold text-sm block mb-1">Nome Completo *</label>
+                                <input id="perfil-nome" type="text" class="input-field w-full p-3 rounded-lg" placeholder="Seu nome completo" required>
+                            </div>
+
+                            <div>
+                                <label class="text-amber-500 font-bold text-sm block mb-1">Telefone / WhatsApp *</label>
+                                <input id="perfil-tel" type="tel" class="input-field w-full p-3 rounded-lg" placeholder="(00) 00000-0000" required>
+                            </div>
+
+                            <div>
+                                <label class="text-amber-500 font-bold text-sm block mb-1">Endereço (Rua/Av) *</label>
+                                <input id="perfil-endereco" type="text" class="input-field w-full p-3 rounded-lg" placeholder="Ex: Av. Brasil ou Rua das Flores" required>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div class="sm:col-span-1">
+                                    <label class="text-amber-500 font-bold text-sm block mb-1">Número *</label>
+                                    <input id="perfil-numero" type="text" class="input-field w-full p-3 rounded-lg" placeholder="Ex: 123" required>
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="text-amber-500 font-bold text-sm block mb-1">CEP *</label>
+                                    <input id="perfil-cep" type="text" class="input-field w-full p-3 rounded-lg" placeholder="00000-000" required>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="text-amber-500 font-bold text-sm block mb-1">Forma de Pagamento Preferida *</label>
+                                <select id="perfil-pagamento" class="input-field w-full p-3 rounded-lg" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="Dinheiro">Dinheiro</option>
+                                    <option value="Cartao">Cartão de Crédito/Débito</option>
+                                    <option value="PIX">PIX</option>
+                                </select>
+                            </div>
+
+                            <div id="perfil-aviso" class="hidden p-3 rounded-lg bg-red-950/60 border border-red-500/40 text-red-400 text-sm flex items-center gap-2 text-left">
+                                <i class="fa fa-circle-exclamation flex-shrink-0"></i>
+                                <span id="perfil-aviso-texto"></span>
+                            </div>
+
+                            <div class="pt-2">
+                                <button id="btn-salvar-perfil" type="submit" class="btn-primary w-full py-3.5 rounded-xl font-bold text-base shadow-lg flex items-center justify-center gap-2">
+                                    <i class="fa fa-save"></i> <span>SALVAR ALTERAÇÕES</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Sidebar Lateral (Menu Hamburger) -->
+        <aside id="client-sidebar" class="client-sidebar flex flex-col">
+            <div class="client-sidebar-header flex items-center justify-between p-4 border-b themed-border">
+                <div class="client-nav-brand">
+                    <img src="orion-logo.png" alt="Orion Express">
+                    <div id="client-nav-brand-text"><strong>ORION</strong><span>EXPRESS</span></div>
+                </div>
+                <button onclick="closeSidebar()" class="lg:hidden text-gray-400 hover:text-white p-2 text-lg">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div class="flex-grow p-4 space-y-2 overflow-y-auto">
+                <button onclick="switchView('menu')" id="side-nav-menu"
+                    class="side-nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl themed-text-secondary hover:text-white transition-colors text-left text-sm font-medium">
+                    <i class="fa fa-utensils text-base text-amber-500 w-6 text-center"></i>
+                    <span>Catálogo</span>
+                </button>
+                <button onclick="toggleCart()" id="side-nav-cart"
+                    class="side-nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl themed-text-secondary hover:text-white transition-colors text-left text-sm font-medium">
+                    <div class="flex items-center gap-3">
+                        <i class="fa fa-shopping-cart text-base text-amber-500 w-6 text-center"></i>
+                        <span>Carrinho</span>
+                    </div>
+                    <span id="side-cart-count" class="bg-amber-500 text-black text-xs font-bold px-2 py-0.5 rounded-full hidden">0</span>
+                </button>
+                <button onclick="switchView('orders')" id="side-nav-orders"
+                    class="side-nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl themed-text-secondary hover:text-white transition-colors text-left text-sm font-medium">
+                    <i class="fa fa-list-alt text-base text-amber-500 w-6 text-center"></i>
+                    <span>Meus Pedidos</span>
+                </button>
+                <button onclick="switchView('profile')" id="side-nav-profile"
+                    class="side-nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl themed-text-secondary hover:text-white transition-colors text-left text-sm font-medium">
+                    <i class="fa fa-id-card text-base text-amber-500 w-6 text-center"></i>
+                    <span>Meus Dados</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Bottom Navigation (Botões Rápidos Mobile) -->
+        <nav
+            class="bottom-nav themed-bg border-t themed-border p-2 flex justify-around items-center fixed bottom-0 w-full z-40 pb-safe">
+            <button onclick="switchView('menu')" id="nav-menu"
+                class="flex flex-col items-center p-2 text-amber-500 transition-colors">
+                <i class="fa fa-utensils text-xl mb-1"></i>
+                <span class="text-[10px] font-bold">Catálogo</span>
+            </button>
+            <button onclick="toggleCart()"
+                class="nav-cart flex flex-col items-center p-2 themed-text-secondary hover:text-white transition-colors relative">
+                <div class="bg-amber-500 rounded-full p-3 -mt-8 border-4 shadow-lg shadow-amber-500/30"
+                    style="border-color: var(--bg-primary)">
+                    <i class="fa fa-shopping-cart text-white text-xl"></i>
+                    <span id="cart-count"
+                        class="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 hidden"
+                        style="border-color: var(--bg-primary)">0</span>
+                </div>
+                <span class="cart-label text-[10px] font-bold">Carrinho</span>
+            </button>
+            <button onclick="switchView('orders')" id="nav-orders"
+                class="flex flex-col items-center p-2 themed-text-secondary hover:text-white transition-colors">
+                <i class="fa fa-list-alt text-xl mb-1"></i>
+                <span class="text-[10px] font-bold">Pedidos</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- ================= CARRINHO (DRAWER) ================= -->
+    <div id="cart-drawer" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 drawer-overlay backdrop-blur-sm" onclick="toggleCart()"></div>
+        <div class="absolute right-0 top-0 bottom-0 w-full max-w-md border-l border-amber-500/20 shadow-2xl flex flex-col slide-up md:animate-none"
+            style="background-color: var(--bg-primary)">
+
+            <div class="p-4 border-b themed-border flex justify-between items-center themed-bg">
+                <h2 class="text-xl font-bold themed-text flex items-center gap-2">
+                    <i class="fa fa-shopping-cart text-amber-500"></i> Seu Carrinho
+                </h2>
+                <button onclick="toggleCart()" class="themed-text-secondary hover:text-white">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <div id="cart-items" class="flex-grow overflow-y-auto p-4 space-y-3">
+                <!-- Itens do carrinho -->
+                <div class="text-center themed-text-secondary py-10 flex flex-col items-center">
+                    <i class="fa fa-shopping-basket text-4xl mb-3 opacity-30"></i>
+                    <p>Seu carrinho está vazio.</p>
+                    <button onclick="toggleCart()" class="mt-4 text-amber-500 font-bold text-sm hover:underline">Ver
+                        Cardápio</button>
+                </div>
+            </div>
+
+            <div class="p-6 themed-bg border-t themed-border">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="themed-text-secondary">Total</span>
+                    <span id="cart-total" class="text-2xl font-bold text-amber-500">R$ 0.00</span>
+                </div>
+                <div class="mb-4">
+                    <label class="text-sm themed-text-secondary block mb-1">Forma de Pagamento</label>
+                    <select id="select-forma-pagamento"
+                        class="w-full p-3 rounded-lg themed-text">
+                        <option value="">Selecione a forma de pagamento...</option>
+                    </select>
+                </div>
+                <div id="loja-fechada-msg" class="hidden mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm themed-text">
+                    <div class="flex items-start gap-3">
+                        <i class="fa fa-store-slash mt-0.5 text-red-500"></i>
+                        <div>
+                            <p class="font-bold text-red-400">Loja fechada no momento.</p>
+                            <p id="loja-fechada-horario" class="text-xs text-gray-400 mt-1"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="cart-aviso" class="hidden mb-4 p-3 rounded-lg bg-red-950/60 border border-red-500/40 text-red-400 text-sm flex items-center gap-2 text-left">
+                    <i class="fa fa-circle-exclamation flex-shrink-0"></i>
+                    <span id="cart-aviso-texto"></span>
+                </div>
+
+                <button onclick="checkout()" id="btn-checkout"
+                    class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    disabled>
+                    <span>FINALIZAR PEDIDO</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MODAL DETALHES DO PEDIDO ================= -->
+    <div id="order-details-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeOrderDetails()"></div>
+        <div class="themed-card w-full max-w-md rounded-2xl shadow-2xl border relative z-10 flex flex-col max-h-[90vh]">
+
+            <!-- Header Modal -->
+            <div class="p-4 border-b themed-border flex justify-between items-center themed-bg rounded-t-2xl">
+                <h3 class="text-xl font-bold themed-text">Detalhes do Pedido</h3>
+                <button onclick="closeOrderDetails()" class="themed-text-secondary hover:text-white">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Content Modal -->
+            <div id="order-details-content" class="p-6 overflow-y-auto space-y-4">
+                <!-- Injetado via JS -->
+            </div>
+
+            <!-- Footer Modal -->
+            <div class="p-4 border-t themed-border themed-bg rounded-b-2xl flex gap-3">
+                <button onclick="generateReceipt()"
+                    class="flex-1 themed-card hover:bg-opacity-80 themed-text py-3 rounded-xl font-bold transition-colors border">
+                    <i class="fa fa-print mr-2"></i> Comprovante
+                </button>
+                <button onclick="closeOrderDetails()"
+                    class="flex-1 bg-amber-500 hover:bg-amber-400 text-black py-3 rounded-xl font-bold transition-colors">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fallback para logos (orion-logo.png em cada deploy)
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('img[alt="Orion Express"]').forEach(img => {
+                img.onerror = function () {
+                    if (this.parentElement.classList.contains('w-10')) {
+                        this.parentElement.innerHTML = '<i class="fa fa-rocket text-black text-xl"></i>';
+                    }
+                };
+            });
+        });
+    </script>
+    <script src="script.js?v=20260915_focusauth"></script>
+</body>
+
+</html>
